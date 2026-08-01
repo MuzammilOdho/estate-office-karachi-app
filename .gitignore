@@ -1,0 +1,114 @@
+# =========================
+# Operating System
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# Logs
+# =========================
+*.log
+*.tmp
+
+# =========================
+# IntelliJ IDEA / Android Studio
+# =========================
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# =========================
+# VS Code
+# Uncomment if you don't want to share workspace settings
+# =========================
+# .vscode/
+
+# =========================
+# Flutter / Dart
+# =========================
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub/
+.pub-cache/
+build/
+coverage/
+
+# Generated API documentation
+doc/api/
+
+# Flutter build metadata
+**/ios/Flutter/.last_build_id
+
+# Flutter generated environment files
+.flutter-versions
+
+# =========================
+# Android
+# =========================
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/local.properties
+android/key.properties
+
+# Signing keys (never commit)
+*.jks
+*.keystore
+*.pem
+
+# =========================
+# iOS / macOS
+# =========================
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.podspec
+ios/Flutter/ephemeral/
+macos/Pods/
+macos/Flutter/ephemeral/
+
+# CocoaPods
+Podfile.lock
+
+# =========================
+# Linux / Windows
+# =========================
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# =========================
+# Web
+# =========================
+# Uncomment if generated web builds should not be tracked
+# web/build/
+
+# =========================
+# Test & Coverage
+# =========================
+coverage/
+lcov.info
+
+# =========================
+# Symbolication / Obfuscation
+# =========================
+app.*.symbols
+app.*.map.json
+
+# =========================
+# Miscellaneous
+# =========================
+*.swp
+*.swo
+*.pyc
+.history/
+.svn/
+.atom/
+.build/
+.buildlog/
+.swiftpm/
+migrate_working_dir/
