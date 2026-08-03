@@ -1,7 +1,9 @@
+import 'package:http/http.dart' as http;
 import 'package:pocketbase/pocketbase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/constants.dart';
+import 'timeout_http_client.dart';
 
 /// Owns the single [PocketBase] client used by the whole app.
 class PocketBaseService {
@@ -24,6 +26,12 @@ class PocketBaseService {
 
   bool get isLoggedIn => _pb?.authStore.isValid ?? false;
 
+  /// LAN-appropriate request timeout. A hung request on the office LAN
+  /// (server busy mid-backup, WiFi AP saturated) should fail fast into
+  /// the friendly retry view rather than spin forever. 12s is generous
+  /// for even a slow query against a 10k-unit estate over WiFi.
+  static const requestTimeout = Duration(seconds: 12);
+
   Future<void> init(String baseUrl) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -37,7 +45,13 @@ class PocketBaseService {
       },
     );
 
-    _pb = PocketBase(baseUrl, authStore: authStore);
+    _pb = PocketBase(
+      baseUrl,
+      authStore: authStore,
+      // Wrap every SDK HTTP call in the shared LAN timeout so a hung
+      // request fails fast into the retry view instead of spinning.
+      httpClientFactory: () => TimeoutHttpClient(http.Client(), requestTimeout),
+    );
   }
 
   Future<void> updateBaseUrl(String baseUrl) async {

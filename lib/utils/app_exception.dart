@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:pocketbase/pocketbase.dart';
@@ -17,6 +18,16 @@ class AppException implements Exception {
 /// [AppException].
 AppException asAppException(Object error) {
   if (error is AppException) return error;
+
+  // A timed-out request — render the same "can't reach the server"
+  // message as a network failure, since the cause is indistinguishable
+  // to the user (server unreachable or too slow to respond).
+  if (error is TimeoutException) {
+    return const AppException(
+      "The server didn't respond in time — check the office PC is on and "
+          "you're connected to the same WiFi, then try again.",
+    );
+  }
 
   if (error is SocketException || error is HttpException) {
     return const AppException(

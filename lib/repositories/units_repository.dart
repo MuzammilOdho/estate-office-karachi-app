@@ -11,6 +11,12 @@ import '../utils/natural_sort.dart';
 class UnitsRepository {
   PocketBase get _pb => PocketBaseService.instance.client;
 
+  /// Ceiling on global-search result rows per query. Same order as the
+  /// audit log's own page size — generous enough that a real search never
+  /// hits it, small enough that no single search transfers a meaningful
+  /// slice of a 10k-unit estate.
+  static const _searchPageSize = 200;
+
   /// Distinct colonies, for the home screen's browse list and the Add Unit
   /// form's colony dropdown. Data-driven (not hardcoded) so a new colony
   /// needs no app update — just add a unit with that colony name.
@@ -65,7 +71,9 @@ class UnitsRepository {
           {'colony': colony, 'type': type},
         ),
       );
-      final joined = await _joinWithActiveAllotments(unitRecords);
+      // Scoped to only this colony+type's units — never the estate-wide
+      // active-allotment table (which is what the old shared helper did).
+      final joined = await _joinUnitsWithActiveAllotmentsFor(unitRecords);
       joined.sort((a, b) => _compareUnits(a.unit, b.unit));
       return joined;
     } catch (e) {
@@ -78,20 +86,82 @@ class UnitsRepository {
   /// designation/department, so staff can find a unit without drilling
   /// through colony → type first. Results are ranked so exact and
   /// starts-with matches surface before loose contains-matches.
+  ///
+  /// Two bounded queries, not a full-table scan: (1) units whose own
+  /// text fields match the query; (2) active allotments whose allottee
+  /// or unit fields match, with allottee + unit expanded. The union is
+  /// small (typically tens of rows), so the existing client-side ranking
+  /// runs over just the matches, not the whole estate.
   Future<List<UnitListItem>> searchAllUnits(String query) async {
     final q = query.trim().toLowerCase();
     if (q.length < 2) return [];
     try {
-      final unitRecords = await _pb.collection(Collections.units).getFullList();
-      final joined = await _joinWithActiveAllotments(unitRecords);
+      // (1) Units matching on their own fields. `~` is PocketBase's
+      // case-insensitive contains, so we pass the raw (not lowercased)
+      // query here — _matchScore still lowercases for ranking below.
+      final unitsPage = await _pb.collection(Collections.units).getList(
+        page: 1,
+        perPage: _searchPageSize,
+        filter: _pb.filter(
+          'house_no ~ {:q} || block ~ {:q} || flat_no ~ {:q} || '
+              'colony ~ {:q} || type ~ {:q}',
+          {'q': query.trim()},
+        ),
+      );
 
+      // (2) Active allotments matching on allottee fields OR on the
+      // related unit's fields (a search by house no should also find an
+      // allotted unit via its allotment). unit.* / allottee.* are
+      // PocketBase relation-chain filters, already used by ExportRepository.
+      final allotmentsPage =
+          await _pb.collection(Collections.allotments).getList(
+        page: 1,
+        perPage: _searchPageSize,
+        filter: _pb.filter(
+          'date_of_vacancy = {:empty} && ('
+              'unit.house_no ~ {:q} || unit.block ~ {:q} || '
+              'unit.flat_no ~ {:q} || unit.colony ~ {:q} || unit.type ~ {:q} || '
+              'allottee.name ~ {:q} || allottee.cnic ~ {:q} || '
+              'allottee.designation ~ {:q} || allottee.department ~ {:q}'
+              ')',
+          {'empty': '', 'q': query.trim()},
+        ),
+        expand: 'allottee, unit',
+      );
+
+      // Build the union keyed by unit id so a unit matched by both
+      // queries isn't listed twice. Allotment-sourced rows carry the
+      // richer allottee info; unit-sourced rows only fill it in if the
+      // unit has no active allotment match above.
+      final byUnit = <String, UnitListItem>{};
+      for (final r in allotmentsPage.items) {
+        final allotment = AllotmentModel.fromRecord(r);
+        final allotteeRecord =
+            r.get<RecordModel?>('expand.allottee', null);
+        final unitRecord = r.get<RecordModel?>('expand.unit', null);
+        if (unitRecord == null) continue; // orphaned allotment — skip
+        byUnit[unitRecord.id] = UnitListItem(
+          unit: UnitModel.fromRecord(unitRecord),
+          activeAllotment: allotment,
+          allotteeName: allotteeRecord?.get<String>('name', ''),
+          allotteeCnic: allotteeRecord?.get<String>('cnic', ''),
+          allotteeDesignation: allotteeRecord?.get<String>('designation', ''),
+          allotteeDepartment: allotteeRecord?.get<String>('department', ''),
+        );
+      }
+      for (final r in unitsPage.items) {
+        final unit = UnitModel.fromRecord(r);
+        byUnit.putIfAbsent(unit.id, () => UnitListItem(unit: unit));
+      }
+
+      // Rank the small union with the same scoring logic as before.
       final scored = <MapEntry<UnitListItem, int>>[];
-      for (final item in joined) {
+      for (final item in byUnit.values) {
         final score = _matchScore(item, q);
         if (score != null) scored.add(MapEntry(item, score));
       }
       scored.sort((a, b) {
-        final scoreCmp = a.value.compareTo(b.value); // lower score = better match
+        final scoreCmp = a.value.compareTo(b.value); // lower score = better
         if (scoreCmp != 0) return scoreCmp;
         return _compareUnits(a.key.unit, b.key.unit);
       });
@@ -144,17 +214,25 @@ class UnitsRepository {
   }
 
   /// Joins a list of unit records with their active allotment (a unit has
-  /// one active allotment at most — enforced in AllotmentsRepository) and
-  /// that allotment's allottee, in 1 extra query total instead of one
-  /// query per unit.
-  Future<List<UnitListItem>> _joinWithActiveAllotments(
+  /// one active allotment at most — enforced on the server, see the
+  /// backend handover notes) and that allotment's allottee. Scoped to only
+  /// the given units via the `?=` ("any-in") operator, so this never
+  /// transfers the estate-wide active-allotment table — the previous
+  /// implementation fetched every active allotment regardless of which
+  /// units were asked for.
+  Future<List<UnitListItem>> _joinUnitsWithActiveAllotmentsFor(
       List<RecordModel> unitRecords,
       ) async {
+    final unitIds = [for (final r in unitRecords) r.id];
+    if (unitIds.isEmpty) {
+      return unitRecords.map((r) => UnitListItem(unit: UnitModel.fromRecord(r))).toList();
+    }
+
     final activeAllotmentRecords =
     await _pb.collection(Collections.allotments).getFullList(
       filter: _pb.filter(
-        'date_of_vacancy = {:empty}',
-        {'empty': ''},
+        'date_of_vacancy = {:empty} && unit ?= {:ids}',
+        {'empty': '', 'ids': unitIds},
       ),
       expand: 'allottee',
     );
@@ -173,7 +251,7 @@ class UnitsRepository {
 
       final allotment = AllotmentModel.fromRecord(allotmentRecord);
       final RecordModel? allotteeRecord =
-      allotmentRecord.get<RecordModel>('expand.allottee', null);
+      allotmentRecord.get<RecordModel?>('expand.allottee', null);
 
       return UnitListItem(
         unit: unit,

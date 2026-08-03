@@ -6,6 +6,7 @@ import '../models/payment_model.dart';
 import '../services/pocketbase_service.dart';
 import '../utils/app_exception.dart';
 import '../utils/fiscal_year_utils.dart';
+import '../utils/paged_result.dart';
 import 'audit_log_repository.dart';
 
 class PaymentsRepository {
@@ -13,9 +14,22 @@ class PaymentsRepository {
 
   PocketBase get _pb => PocketBaseService.instance.client;
 
-  Future<List<PaymentModel>> getHistoryForAllotment(String allotmentId) async {
+  /// Page size for the payment-history list. Long-occupied units
+  /// accumulate many payments over the years; loading 50 at a time keeps
+  /// first paint fast while "load more on scroll" fetches the rest.
+  static const historyPerPage = 50;
+
+  /// One page of a payment history, newest first. Callers fetch page 1
+  /// on open and request further pages via [page] as the user scrolls.
+  Future<PagedResult<PaymentModel>> getHistoryForAllotment(
+    String allotmentId, {
+    int page = 1,
+    int perPage = historyPerPage,
+  }) async {
     try {
-      final records = await _pb.collection(Collections.payments).getFullList(
+      final result = await _pb.collection(Collections.payments).getList(
+        page: page,
+        perPage: perPage,
         filter: _pb.filter(
           'allotment = {:allotmentId}',
           {'allotmentId': allotmentId},
@@ -23,7 +37,16 @@ class PaymentsRepository {
         sort: '-date',
         expand: 'created_by',
       );
-      return records.map((r) => PaymentModel.fromRecord(r, _pb)).toList();
+      final items = result.items
+          .map((r) => PaymentModel.fromRecord(r, _pb))
+          .toList();
+      return PagedResult(
+        items: items,
+        page: result.page,
+        perPage: result.perPage,
+        totalItems: result.totalItems,
+        totalPages: result.totalPages,
+      );
     } catch (e) {
       throw asAppException(e);
     }

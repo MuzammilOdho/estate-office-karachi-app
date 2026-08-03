@@ -7,16 +7,17 @@ import '../models/allottee_model.dart';
 import '../models/payment_model.dart';
 import '../providers/auth_provider.dart';
 import '../repositories/allotments_repository.dart';
+import '../repositories/payments_repository.dart';
 import '../screens/allottee_history_screen.dart';
 import '../screens/modify_allottee_sheet.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_exception.dart';
+import 'payment_list.dart';
 
 class AllottedUnitView extends StatefulWidget {
   final String unitLabel;
   final AllotmentModel allotment;
   final AllotteeModel allottee;
-  final List<PaymentModel> payments;
   final VoidCallback onRecordPayment;
   final VoidCallback onAllotteeModified;
   final VoidCallback onVacated;
@@ -26,7 +27,6 @@ class AllottedUnitView extends StatefulWidget {
     required this.unitLabel,
     required this.allotment,
     required this.allottee,
-    required this.payments,
     required this.onRecordPayment,
     required this.onAllotteeModified,
     required this.onVacated,
@@ -38,10 +38,19 @@ class AllottedUnitView extends StatefulWidget {
 
 class _AllottedUnitViewState extends State<AllottedUnitView> {
   final _allotmentsRepository = AllotmentsRepository();
+  final _paymentsRepository = PaymentsRepository();
   bool _isVacating = false;
   String? _errorMessage;
 
   static final _dateFormat = DateFormat('dd MMM yyyy');
+
+  Future<List<PaymentModel>> _loadPaymentsPage(int page) async {
+    final result = await _paymentsRepository.getHistoryForAllotment(
+      widget.allotment.id,
+      page: page,
+    );
+    return result.items;
+  }
 
   Future<void> _confirmVacate() async {
     final confirmed = await showDialog<bool>(
@@ -182,16 +191,10 @@ class _AllottedUnitViewState extends State<AllottedUnitView> {
         const SizedBox(height: 24),
         Text('Payment history', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-        if (widget.payments.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text(
-              'No payments recorded yet.',
-              style: TextStyle(color: AppColors.vacantGray),
-            ),
-          )
-        else
-          ...widget.payments.map((p) => _PaymentTile(payment: p)),
+        PaymentList(
+          loadPage: _loadPaymentsPage,
+          showAmountDue: true,
+        ),
         const SizedBox(height: 24),
         if (_errorMessage != null) ...[
           Text(_errorMessage!, style: const TextStyle(color: AppColors.dueRed)),
@@ -237,55 +240,6 @@ class _InfoRow extends StatelessWidget {
             child: Text(value, style: monospace ? AppTheme.numericData : null),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _PaymentTile extends StatelessWidget {
-  final PaymentModel payment;
-  const _PaymentTile({required this.payment});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
-      child: ListTile(
-        leading: payment.challanImageUrl.isNotEmpty
-            ? ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            payment.challanImageUrl,
-            width: 44,
-            height: 44,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-            const Icon(Icons.receipt_long_outlined, color: AppColors.vacantGray),
-          ),
-        )
-            : const Icon(Icons.receipt_long_outlined, color: AppColors.vacantGray),
-        title: Text(
-          'FY ${payment.fy} · ${DateFormat('dd MMM yyyy').format(payment.date)}',
-          style: AppTheme.numericData.copyWith(fontSize: 13),
-        ),
-        subtitle: Text(
-          'Challan #${payment.challanNo} · Added by ${payment.addedByName}'
-              '${payment.amountDue > 0 ? ' · Due: Rs. ${payment.amountDue.toStringAsFixed(0)}' : ''}',
-        ),
-        trailing: Text(
-          'Rs. ${payment.amountPaid.toStringAsFixed(0)}',
-          style: AppTheme.numericData,
-        ),
-        onTap: payment.challanImageUrl.isEmpty
-            ? null
-            : () => showDialog(
-          context: context,
-          builder: (_) => Dialog(
-            child: InteractiveViewer(
-              child: Image.network(payment.challanImageUrl),
-            ),
-          ),
-        ),
       ),
     );
   }

@@ -2,26 +2,42 @@ import 'package:pocketbase/pocketbase.dart';
 
 import '../config/constants.dart';
 import '../models/allotment_model.dart';
+import '../models/allottee_model.dart';
 import '../services/pocketbase_service.dart';
 import '../utils/app_exception.dart';
 import 'audit_log_repository.dart';
+
+/// An allotment paired with its (possibly missing) allottee, resolved
+/// in a single query via `expand`. Used by the allotment history screen.
+class AllotmentWithAllottee {
+  final AllotmentModel allotment;
+  final AllotteeModel? allottee;
+  const AllotmentWithAllottee(this.allotment, this.allottee);
+}
 
 class AllotmentsRepository {
   final AuditLogRepository _auditLogRepository = AuditLogRepository();
 
   PocketBase get _pb => PocketBaseService.instance.client;
 
+  /// The active allotment for a unit, if any. An allotment is active
+  /// exactly when `date_of_vacancy` is empty — so we filter on that
+  /// server-side and ask for just the one matching row, instead of
+  /// fetching the unit's entire allotment history and picking through it
+  /// in Dart.
   Future<AllotmentModel?> getActiveAllotmentForUnit(String unitId) async {
     try {
-      final records = await _pb.collection(Collections.allotments).getFullList(
-        filter: _pb.filter('unit = {:unitId}', {'unitId': unitId}),
+      final result = await _pb.collection(Collections.allotments).getList(
+        page: 1,
+        perPage: 1,
+        filter: _pb.filter(
+          'unit = {:unitId} && date_of_vacancy = {:empty}',
+          {'unitId': unitId, 'empty': ''},
+        ),
         sort: '-date_of_allotment',
       );
-      for (final r in records) {
-        final allotment = AllotmentModel.fromRecord(r);
-        if (allotment.isActive) return allotment;
-      }
-      return null;
+      if (result.items.isEmpty) return null;
+      return AllotmentModel.fromRecord(result.items.first);
     } catch (e) {
       throw asAppException(e);
     }
@@ -97,17 +113,28 @@ class AllotmentsRepository {
   }
 
   /// Every allotment this unit has ever had — active and vacated — most
-  /// recent first. Backs the Allotment History screen, since once a unit
-  /// is vacated its previous allottee otherwise becomes completely
-  /// inaccessible (getActiveAllotmentForUnit only ever returns the
-  /// current one, by design).
-  Future<List<AllotmentModel>> getAllAllotmentsForUnit(String unitId) async {
+  /// recent first, each with its allottee expanded. Backs the Allotment
+  /// History screen, since once a unit is vacated its previous allottee
+  /// otherwise becomes completely inaccessible (getActiveAllotmentForUnit
+  /// only ever returns the current one, by design). `expand: 'allottee'`
+  /// resolves the allottee in the same query, avoiding an N+1 of
+  /// per-allotment getAllottee calls.
+  Future<List<AllotmentWithAllottee>> getAllAllotmentsForUnit(
+      String unitId) async {
     try {
       final records = await _pb.collection(Collections.allotments).getFullList(
         filter: _pb.filter('unit = {:unitId}', {'unitId': unitId}),
         sort: '-date_of_allotment',
+        expand: 'allottee',
       );
-      return records.map(AllotmentModel.fromRecord).toList();
+      return records.map((r) {
+        final allotment = AllotmentModel.fromRecord(r);
+        final allotteeRecord = r.get<RecordModel?>('expand.allottee', null);
+        final allottee = allotteeRecord == null
+            ? null
+            : AllotteeModel.fromRecord(allotteeRecord);
+        return AllotmentWithAllottee(allotment, allottee);
+      }).toList();
     } catch (e) {
       throw asAppException(e);
     }

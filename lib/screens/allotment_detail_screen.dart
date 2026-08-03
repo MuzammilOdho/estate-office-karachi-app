@@ -6,8 +6,7 @@ import '../models/allottee_model.dart';
 import '../models/payment_model.dart';
 import '../repositories/payments_repository.dart';
 import '../theme/app_theme.dart';
-import '../utils/app_exception.dart';
-import '../widgets/state_views.dart';
+import '../widgets/payment_list.dart';
 
 /// Read-only — no "Add payment" button. A vacated allotment is history,
 /// not something new activity should be recorded against; only the
@@ -26,42 +25,17 @@ class AllotmentDetailScreen extends StatefulWidget {
   State<AllotmentDetailScreen> createState() => _AllotmentDetailScreenState();
 }
 
-enum _LoadState { loading, loaded, error }
-
 class _AllotmentDetailScreenState extends State<AllotmentDetailScreen> {
   final _paymentsRepository = PaymentsRepository();
-  _LoadState _state = _LoadState.loading;
-  String? _errorMessage;
-  List<PaymentModel> _payments = [];
 
   static final _dateFormat = DateFormat('dd MMM yyyy');
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _state = _LoadState.loading;
-      _errorMessage = null;
-    });
-    try {
-      final payments =
-      await _paymentsRepository.getHistoryForAllotment(widget.allotment.id);
-      if (!mounted) return;
-      setState(() {
-        _payments = payments;
-        _state = _LoadState.loaded;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = e is AppException ? e.message : 'Something went wrong.';
-        _state = _LoadState.error;
-      });
-    }
+  Future<List<PaymentModel>> _loadPaymentsPage(int page) async {
+    final result = await _paymentsRepository.getHistoryForAllotment(
+      widget.allotment.id,
+      page: page,
+    );
+    return result.items;
   }
 
   @override
@@ -128,37 +102,13 @@ class _AllotmentDetailScreenState extends State<AllotmentDetailScreen> {
             const SizedBox(height: 20),
             Text('Payment history', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            _buildPayments(),
+            PaymentList(
+              loadPage: _loadPaymentsPage,
+            ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildPayments() {
-    switch (_state) {
-      case _LoadState.loading:
-        return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 20),
-          child: LoadingView(),
-        );
-      case _LoadState.error:
-        return ErrorRetryView(
-          message: _errorMessage ?? 'Something went wrong.',
-          onRetry: _load,
-        );
-      case _LoadState.loaded:
-        if (_payments.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text(
-              'No payments recorded for this allotment.',
-              style: TextStyle(color: AppColors.vacantGray),
-            ),
-          );
-        }
-        return Column(children: _payments.map((p) => _PaymentTile(payment: p)).toList());
-    }
   }
 }
 
@@ -184,52 +134,6 @@ class _InfoRow extends StatelessWidget {
             child: Text(value, style: monospace ? AppTheme.numericData : null),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _PaymentTile extends StatelessWidget {
-  final PaymentModel payment;
-  const _PaymentTile({required this.payment});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
-      child: ListTile(
-        leading: payment.challanImageUrl.isNotEmpty
-            ? ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            payment.challanImageUrl,
-            width: 44,
-            height: 44,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-            const Icon(Icons.receipt_long_outlined, color: AppColors.vacantGray),
-          ),
-        )
-            : const Icon(Icons.receipt_long_outlined, color: AppColors.vacantGray),
-        title: Text(
-          'FY ${payment.fy} · ${DateFormat('dd MMM yyyy').format(payment.date)}',
-          style: AppTheme.numericData.copyWith(fontSize: 13),
-        ),
-        subtitle: Text('Challan #${payment.challanNo} · Added by ${payment.addedByName}'),
-        trailing: Text(
-          'Rs. ${payment.amountPaid.toStringAsFixed(0)}',
-          style: AppTheme.numericData,
-        ),
-        onTap: payment.challanImageUrl.isEmpty
-            ? null
-            : () => showDialog(
-          context: context,
-          builder: (_) => Dialog(
-            child: InteractiveViewer(
-              child: Image.network(payment.challanImageUrl),
-            ),
-          ),
-        ),
       ),
     );
   }

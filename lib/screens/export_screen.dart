@@ -144,35 +144,38 @@ class _ExportScreenState extends State<ExportScreen> {
     });
 
     try {
-      final rows = await _exportRepository.buildReport(
-        scope: _scope,
-        period: _period,
-        unitId: _scope == ExportScope.singleUnit ? _selectedUnitId : null,
-        colony: _scope == ExportScope.colony ? _selectedColony : null,
-        fy: _period == ExportPeriod.fiscalYear ? _selectedFy : null,
-        year: _period == ExportPeriod.month ? _selectedMonth.year : null,
-        month: _period == ExportPeriod.month ? _selectedMonth.month : null,
+      final rowCount = await CsvExport.shareCsv(
+        rows: _exportRepository.streamReport(
+          scope: _scope,
+          period: _period,
+          unitId: _scope == ExportScope.singleUnit ? _selectedUnitId : null,
+          colony: _scope == ExportScope.colony ? _selectedColony : null,
+          fy: _period == ExportPeriod.fiscalYear ? _selectedFy : null,
+          year: _period == ExportPeriod.month ? _selectedMonth.year : null,
+          month: _period == ExportPeriod.month ? _selectedMonth.month : null,
+        ),
+        reportLabel: _scopeLabel,
+        periodLabel: _periodLabel,
+        onRowCount: (count) {
+          // Update the row count in the UI as rows stream in.
+          if (mounted) setState(() => _lastRowCount = count);
+        },
       );
 
-      if (rows.isEmpty) {
+      if (!mounted) return;
+      if (rowCount == 0) {
         setState(() {
           _errorMessage = 'No payments found for $_scopeLabel, $_periodLabel.';
         });
         return;
       }
-
-      await CsvExport.shareCsv(
-        rows: rows,
-        reportLabel: _scopeLabel,
-        periodLabel: _periodLabel,
-      );
-
-      if (!mounted) return;
-      setState(() => _lastRowCount = rows.length);
+      setState(() => _lastRowCount = rowCount);
     } catch (e) {
-      setState(() {
-        _errorMessage = e is AppException ? e.message : 'Something went wrong.';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e is AppException ? e.message : 'Something went wrong.';
+        });
+      }
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }

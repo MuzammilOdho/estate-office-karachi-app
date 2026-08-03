@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../models/allotment_model.dart';
-import '../models/allottee_model.dart';
 import '../repositories/allotments_repository.dart';
-import '../repositories/allottees_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_exception.dart';
 import '../widgets/state_views.dart';
@@ -27,19 +24,12 @@ class UnitAllotmentHistoryScreen extends StatefulWidget {
 
 enum _LoadState { loading, loaded, error }
 
-class _AllotmentWithAllottee {
-  final AllotmentModel allotment;
-  final AllotteeModel? allottee;
-  const _AllotmentWithAllottee(this.allotment, this.allottee);
-}
-
 class _UnitAllotmentHistoryScreenState extends State<UnitAllotmentHistoryScreen> {
   final _allotmentsRepository = AllotmentsRepository();
-  final _allotteesRepository = AllotteesRepository();
 
   _LoadState _state = _LoadState.loading;
   String? _errorMessage;
-  List<_AllotmentWithAllottee> _items = [];
+  List<AllotmentWithAllottee> _items = [];
 
   @override
   void initState() {
@@ -53,15 +43,8 @@ class _UnitAllotmentHistoryScreenState extends State<UnitAllotmentHistoryScreen>
       _errorMessage = null;
     });
     try {
-      final allotments = await _allotmentsRepository.getAllAllotmentsForUnit(widget.unitId);
-      final items = await Future.wait(allotments.map((a) async {
-        try {
-          final allottee = await _allotteesRepository.getAllottee(a.allotteeId);
-          return _AllotmentWithAllottee(a, allottee);
-        } catch (_) {
-          return _AllotmentWithAllottee(a, null);
-        }
-      }));
+      final items =
+          await _allotmentsRepository.getAllAllotmentsForUnit(widget.unitId);
       if (!mounted) return;
       setState(() {
         _items = items;
@@ -106,7 +89,8 @@ class _UnitAllotmentHistoryScreenState extends State<UnitAllotmentHistoryScreen>
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: _items.length,
-            itemBuilder: (context, index) => _AllotmentCard(item: _items[index]),
+            itemBuilder: (context, index) =>
+                _AllotmentCard(item: _items[index]),
           ),
         );
     }
@@ -114,7 +98,7 @@ class _UnitAllotmentHistoryScreenState extends State<UnitAllotmentHistoryScreen>
 }
 
 class _AllotmentCard extends StatelessWidget {
-  final _AllotmentWithAllottee item;
+  final AllotmentWithAllottee item;
   const _AllotmentCard({required this.item});
 
   @override
@@ -132,7 +116,7 @@ class _AllotmentCard extends StatelessWidget {
           isActive
               ? 'Since ${dateFormat.format(allotment.dateOfAllotment)} · Current'
               : '${dateFormat.format(allotment.dateOfAllotment)} – '
-              '${allotment.dateOfVacancy != null ? dateFormat.format(allotment.dateOfVacancy!) : '?'}',
+                  '${allotment.dateOfVacancy != null ? dateFormat.format(allotment.dateOfVacancy!) : '?'}',
         ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -153,13 +137,13 @@ class _AllotmentCard extends StatelessWidget {
         onTap: allottee == null
             ? null
             : () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => AllotmentDetailScreen(
-              allotment: allotment,
-              allottee: allottee,
-            ),
-          ),
-        ),
+                  MaterialPageRoute(
+                    builder: (_) => AllotmentDetailScreen(
+                      allotment: allotment,
+                      allottee: allottee,
+                    ),
+                  ),
+                ),
       ),
     );
   }

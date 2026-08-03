@@ -38,55 +38,90 @@ class CsvExport {
     'Balance',
   ];
 
-  static String buildCsv(List<ExportRow> rows) {
-    final data = <List<dynamic>>[_headers];
-    for (var i = 0; i < rows.length; i++) {
-      final row = rows[i];
-      data.add([
-        i + 1,
-        row.fy,
-        row.unitLabel,
-        row.type,
-        row.colony,
-        row.allotteeName,
-        row.designation,
-        row.department,
-        _dateFormat.format(row.dateOfAllotment),
-        _dateFormat.format(row.dateOfOccupation),
-        row.dob == null ? '' : _dateFormat.format(row.dob!),
-        row.paymentDate.day,
-        _monthFormat.format(row.paymentDate),
-        row.paymentDate.year,
-        row.amountDue,
-        row.amountRecovered,
-        row.balance,
-      ]);
+  /// Writes the CSV header and then each row from [rows] as it arrives,
+  /// flushing to [sink] incrementally. Memory stays at one row at a time
+  /// regardless of export size — the caller streams rows from the server
+  /// page-by-page, and this writes each page's worth to the file and
+  /// discards it.
+  static Future<int> writeCsvTo(
+    Stream<ExportRow> rows,
+    StringSink sink, {
+    void Function(int)? onRowCount,
+  }) async {
+    const csv = ListToCsvConverter();
+    sink.writeln(csv.convert([_headers]));
+
+    int count = 0;
+    await for (final row in rows) {
+      count++;
+      // convert() takes a list of rows, so wrap the single row.
+      sink.writeln(csv.convert([
+        [
+          count,
+          row.fy,
+          row.unitLabel,
+          row.type,
+          row.colony,
+          row.allotteeName,
+          row.designation,
+          row.department,
+          _dateFormat.format(row.dateOfAllotment),
+          _dateFormat.format(row.dateOfOccupation),
+          row.dob == null ? '' : _dateFormat.format(row.dob!),
+          row.paymentDate.day,
+          _monthFormat.format(row.paymentDate),
+          row.paymentDate.year,
+          row.amountDue,
+          row.amountRecovered,
+          row.balance,
+        ],
+      ]));
+      onRowCount?.call(count);
     }
-    return const ListToCsvConverter().convert(data);
+    return count;
   }
 
-  /// Writes the CSV to a temp file and opens the system share sheet so
-  /// staff can send it via WhatsApp/email or save it.
-  static Future<void> shareCsv({
-    required List<ExportRow> rows,
+  /// Streams the CSV from [rows] into a temp file and opens the system
+  /// share sheet so staff can send it via WhatsApp/email or save it.
+  /// Returns the final row count for the caller to display.
+  static Future<int> shareCsv({
+    required Stream<ExportRow> rows,
     required String reportLabel,
     required String periodLabel,
+    void Function(int)? onRowCount,
   }) async {
     try {
-      final csvString = buildCsv(rows);
       final dir = await getTemporaryDirectory();
       final safeName =
-      '${reportLabel}_$periodLabel'.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+          '${reportLabel}_$periodLabel'.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
       final file = File('${dir.path}/$safeName.csv');
-      await file.writeAsString(csvString);
 
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          subject: '$reportLabel — $periodLabel',
-          text: '$reportLabel — $periodLabel',
-        ),
-      );
+      // Open the file for writing and stream the CSV into it.
+      final sink = file.openWrite();
+      try {
+        final count = await writeCsvTo(
+          rows,
+          sink,
+          onRowCount: onRowCount,
+        );
+        await sink.flush();
+        await sink.close();
+
+        // Nothing to share if the stream yielded no rows.
+        if (count == 0) return 0;
+
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(file.path)],
+            subject: '$reportLabel — $periodLabel',
+            text: '$reportLabel — $periodLabel',
+          ),
+        );
+        return count;
+      } catch (e) {
+        await sink.close();
+        rethrow;
+      }
     } catch (e) {
       throw asAppException(e);
     }

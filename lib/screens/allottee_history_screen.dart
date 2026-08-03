@@ -188,10 +188,15 @@ class _DocumentThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Match the displayed 64×64 thumbnail (× device pixel ratio) so the
+    // full-resolution document image isn't decoded into memory.
+    final thumbPx = (64 * MediaQuery.devicePixelRatioOf(context)).ceil();
+
     return InkWell(
       onTap: () => showDialog(
         context: context,
         builder: (_) => Dialog(
+          // Full-size on tap — intentionally no cache sizing here.
           child: InteractiveViewer(child: Image.network(url)),
         ),
       ),
@@ -202,6 +207,8 @@ class _DocumentThumb extends StatelessWidget {
           width: 64,
           height: 64,
           fit: BoxFit.cover,
+          cacheWidth: thumbPx,
+          cacheHeight: thumbPx,
           errorBuilder: (_, __, ___) => Container(
             width: 64,
             height: 64,

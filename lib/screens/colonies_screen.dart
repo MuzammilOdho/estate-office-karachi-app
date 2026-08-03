@@ -41,6 +41,11 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
   bool _isSearching = false;
   List<UnitListItem> _searchResults = [];
   bool _searchAttempted = false;
+  /// Whether the search field is non-empty — used to toggle between the
+  /// search-results and colony-list UI. Only triggers a rebuild when the
+  /// empty ↔ non-empty transition actually happens, avoiding per-keystroke
+  /// full-Scaffold rebuilds.
+  bool _isSearchingMode = false;
 
   @override
   void initState() {
@@ -123,7 +128,6 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isSearchingMode = _searchController.text.trim().isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -167,7 +171,11 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
               child: TextField(
                 controller: _searchController,
                 onChanged: (value) {
-                  setState(() {}); // toggle search-mode vs colony-list UI
+                  final wasSearchingMode = _isSearchingMode;
+                  _isSearchingMode = value.trim().isNotEmpty;
+                  if (wasSearchingMode != _isSearchingMode) {
+                    setState(() {}); // empty ↔ non-empty transition only
+                  }
                   _onSearchChanged(value);
                 },
                 decoration: InputDecoration(
@@ -182,7 +190,7 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
-                      : (isSearchingMode
+                      : (_isSearchingMode
                       ? IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () {
@@ -198,12 +206,12 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
               ),
             ),
             Expanded(
-              child: isSearchingMode ? _buildSearchResults() : _buildColoniesList(),
+              child: _isSearchingMode ? _buildSearchResults() : _buildColoniesList(),
             ),
           ],
         ),
       ),
-      floatingActionButton: (isSearchingMode || !context.watch<AuthProvider>().isAdmin)
+      floatingActionButton: (_isSearchingMode || !context.watch<AuthProvider>().isAdmin)
           ? null
           : FloatingActionButton(
         tooltip: 'Add unit',

@@ -3,12 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../models/allotment_model.dart';
 import '../models/allottee_model.dart';
-import '../models/payment_model.dart';
 import '../models/unit_model.dart';
 import '../providers/auth_provider.dart';
 import '../repositories/allotments_repository.dart';
 import '../repositories/allottees_repository.dart';
-import '../repositories/payments_repository.dart';
 import '../repositories/units_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_exception.dart';
@@ -36,7 +34,6 @@ class _UnitDetailSheetState extends State<UnitDetailSheet> {
   final _unitsRepository = UnitsRepository();
   final _allotmentsRepository = AllotmentsRepository();
   final _allotteesRepository = AllotteesRepository();
-  final _paymentsRepository = PaymentsRepository();
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -44,7 +41,6 @@ class _UnitDetailSheetState extends State<UnitDetailSheet> {
   UnitModel? _unit;
   AllotmentModel? _allotment;
   AllotteeModel? _allottee;
-  List<PaymentModel> _payments = [];
 
   @override
   void initState() {
@@ -63,10 +59,8 @@ class _UnitDetailSheetState extends State<UnitDetailSheet> {
       final allotment = await _allotmentsRepository.getActiveAllotmentForUnit(unit.id);
 
       AllotteeModel? allottee;
-      List<PaymentModel> payments = const [];
       if (allotment != null) {
         allottee = await _allotteesRepository.getAllottee(allotment.allotteeId);
-        payments = await _paymentsRepository.getHistoryForAllotment(allotment.id);
       }
 
       if (!mounted) return;
@@ -74,7 +68,6 @@ class _UnitDetailSheetState extends State<UnitDetailSheet> {
         _unit = unit;
         _allotment = allotment;
         _allottee = allottee;
-        _payments = payments;
         _isLoading = false;
       });
     } catch (e) {
@@ -222,7 +215,6 @@ class _UnitDetailSheetState extends State<UnitDetailSheet> {
             unitLabel: unit.displayLabel,
             allotment: allotment,
             allottee: allottee,
-            payments: _payments,
             onRecordPayment: _openRecordPayment,
             onAllotteeModified: _load,
             onVacated: _handleVacated,
