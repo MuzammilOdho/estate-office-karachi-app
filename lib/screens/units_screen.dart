@@ -27,7 +27,12 @@ class _UnitsScreenState extends State<UnitsScreen> {
   _LoadState _state = _LoadState.loading;
   String? _errorMessage;
   List<UnitListItem> _allItems = [];
+
+  // Local filter state. Kept in a field (not derived per-build) so the
+  // filtered list is recomputed only when the filter or the source list
+  // actually changes, not on every rebuild.
   String _filter = '';
+  List<UnitListItem> _visibleItems = const [];
 
   @override
   void initState() {
@@ -48,6 +53,7 @@ class _UnitsScreenState extends State<UnitsScreen> {
       if (!mounted) return;
       setState(() {
         _allItems = items;
+        _visibleItems = _applyFilter(items, _filter);
         _state = _LoadState.loaded;
       });
     } catch (e) {
@@ -59,20 +65,36 @@ class _UnitsScreenState extends State<UnitsScreen> {
     }
   }
 
-  List<UnitListItem> get _visibleItems {
-    final q = _filter.trim().toLowerCase();
-    if (q.isEmpty) return _allItems;
-    return _allItems.where((item) {
+  void _onFilterChanged(String value) {
+    final newFilter = value.trim().toLowerCase();
+    if (newFilter == _filter) return;
+    setState(() {
+      _filter = newFilter;
+      _visibleItems = _applyFilter(_allItems, newFilter);
+    });
+  }
+
+  /// Filters [items] by [query] against house no / block / flat no /
+  /// allottee name / CNIC. Pure function so it can be called from both
+  /// [_load] and [_onFilterChanged] without duplicating the predicate.
+  static List<UnitListItem> _applyFilter(
+      List<UnitListItem> items, String query) {
+    if (query.isEmpty) return items;
+    return items.where((item) {
       final houseNo = item.unit.houseNo.toLowerCase();
       final block = item.unit.block.toLowerCase();
       final flatNo = item.unit.flatNo.toLowerCase();
       final allottee = (item.allotteeName ?? '').toLowerCase();
       final cnic = (item.allotteeCnic ?? '').toLowerCase();
-      return houseNo.contains(q) ||
-          block.contains(q) ||
-          flatNo.contains(q) ||
-          allottee.contains(q) ||
-          cnic.contains(q);
+      final personalNo = (item.allotteePersonalNo ?? '').toLowerCase();
+      final phone = (item.allotteePhone ?? '').toLowerCase();
+      return houseNo.contains(query) ||
+          block.contains(query) ||
+          flatNo.contains(query) ||
+          allottee.contains(query) ||
+          cnic.contains(query) ||
+          personalNo.contains(query) ||
+          phone.contains(query);
     }).toList();
   }
 
@@ -86,7 +108,7 @@ class _UnitsScreenState extends State<UnitsScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: TextField(
-                onChanged: (v) => setState(() => _filter = v),
+                onChanged: _onFilterChanged,
                 decoration: const InputDecoration(
                   hintText: 'Search house no, allottee name, or CNIC',
                   prefixIcon: Icon(Icons.search),
@@ -130,8 +152,7 @@ class _UnitsScreenState extends State<UnitsScreen> {
             subtitle: 'Tap the + button to add one.',
           );
         }
-        final visible = _visibleItems;
-        if (visible.isEmpty) {
+        if (_visibleItems.isEmpty) {
           return const EmptyStateView(
             icon: Icons.search_off_rounded,
             title: 'No matches',
@@ -142,10 +163,11 @@ class _UnitsScreenState extends State<UnitsScreen> {
           onRefresh: _load,
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
-            itemCount: visible.length,
+            itemCount: _visibleItems.length,
             itemBuilder: (context, index) {
-              final item = visible[index];
+              final item = _visibleItems[index];
               return UnitCard(
+                key: ValueKey(item.unit.id),
                 item: item,
                 onTap: () => showModalBottomSheet(
                   context: context,

@@ -28,9 +28,9 @@ class PocketBaseService {
 
   /// LAN-appropriate request timeout. A hung request on the office LAN
   /// (server busy mid-backup, WiFi AP saturated) should fail fast into
-  /// the friendly retry view rather than spin forever. 12s is generous
-  /// for even a slow query against a 10k-unit estate over WiFi.
-  static const requestTimeout = Duration(seconds: 12);
+  /// the friendly retry view rather than spin forever. 20s accommodates
+  /// the search query with expand + multiple OR-clauses on a slow LAN.
+  static const requestTimeout = Duration(seconds: 20);
 
   Future<void> init(String baseUrl) async {
     final prefs = await SharedPreferences.getInstance();

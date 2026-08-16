@@ -8,74 +8,88 @@ import 'package:share_plus/share_plus.dart';
 import '../models/export_row.dart';
 import 'app_exception.dart';
 
-/// Builds the CSV matching the office's existing register format: one
-/// row per payment, with the payment date split into separate
-/// Date/Month/Year columns and Amount Due/Amount Recovered/Balance at
-/// the end.
+/// Builds the CSV matching the office's Excel register layout (22 columns).
+/// Columns Q, R, U are left blank for manual entry in Excel.
 class CsvExport {
   CsvExport._();
 
   static final _dateFormat = DateFormat('dd MMM yyyy');
-  static final _monthFormat = DateFormat('MMMM');
 
+  /// Headers matching the Excel template exactly (A–V).
   static const _headers = [
-    'S.No',
-    'FY',
-    'Flat No./Quarter/House No.',
-    'Category/Type',
-    'Location',
-    'Name',
-    'Designation',
+    'Sr. No.',
+    'Category / Type',
+    'House No',
+    'Block No.',
+    'Flat No',
+    'Colony',
+    'Personal No',
+    'FGS Name',
+    'FGS Designation',
+    'BS',
     'Department',
-    'Original Date of Allotment',
-    'Date of Occupation',
-    'Date of Birth',
-    'Date',
-    'Month',
-    'Year',
-    'Amount Due',
-    'Amount Recovered',
-    'Balance',
+    'FGS CNIC',
+    'Date Of Occupation',
+    'Allotment Date',
+    'Date Of Birth',
+    'Date of Retirement',
+    'Previous Outstanding Balance',    // Q — manual
+    'Demand of Current FY',             // R — manual
+    'Payment Date',                     // S — new
+    'Rent Amount Recovered through Challans', // T
+    'Total Outstanding',                // U — manual
+    'Remarks',                          // V
   ];
 
   /// Writes the CSV header and then each row from [rows] as it arrives,
-  /// flushing to [sink] incrementally. Memory stays at one row at a time
-  /// regardless of export size — the caller streams rows from the server
-  /// page-by-page, and this writes each page's worth to the file and
-  /// discards it.
+  /// flushing to [sink] incrementally. Memory stays at one row at a time.
   static Future<int> writeCsvTo(
     Stream<ExportRow> rows,
     StringSink sink, {
     void Function(int)? onRowCount,
   }) async {
     const csv = ListToCsvConverter();
-    sink.writeln(csv.convert([_headers]));
+    sink.write(csv.convert([_headers]));
+    sink.write('\r\n');
 
     int count = 0;
     await for (final row in rows) {
       count++;
-      // convert() takes a list of rows, so wrap the single row.
-      sink.writeln(csv.convert([
+      sink.write(csv.convert([
         [
-          count,
-          row.fy,
-          row.unitLabel,
-          row.type,
-          row.colony,
-          row.allotteeName,
-          row.designation,
-          row.department,
-          _dateFormat.format(row.dateOfAllotment),
-          _dateFormat.format(row.dateOfOccupation),
-          row.dob == null ? '' : _dateFormat.format(row.dob!),
-          row.paymentDate.day,
-          _monthFormat.format(row.paymentDate),
-          row.paymentDate.year,
-          row.amountDue,
-          row.amountRecovered,
-          row.balance,
+          count,                                    // A — Sr. No.
+          row.type,                                 // B — Category / Type
+          row.houseNo,                              // C — House No
+          row.block,                                // D — Block No.
+          row.flatNo,                               // E — Flat No
+          row.colony,                               // F — Colony
+          row.personalNo,                           // G — Personal No
+          row.allotteeName,                         // H — FGS Name
+          row.designation,                          // I — FGS Designation
+          row.bs,                                   // J — BS
+          row.department,                           // K — Department
+          row.cnic,                                 // L — FGS CNIC
+          row.dateOfOccupation == null
+              ? ''
+              : _dateFormat.format(row.dateOfOccupation!), // M — Date Of Occupation
+          row.dateOfAllotment == null
+              ? ''
+              : _dateFormat.format(row.dateOfAllotment!),  // N — Allotment Date
+          row.dob == null ? '' : _dateFormat.format(row.dob!), // O — Date Of Birth
+          row.dateOfRetirement == null
+              ? ''
+              : _dateFormat.format(row.dateOfRetirement!), // P — Date of Retirement
+          '', // Q — Previous Outstanding Balance (manual)
+          '', // R — Demand of Current FY (manual)
+          row.paymentDate == null
+              ? ''
+              : _dateFormat.format(row.paymentDate!), // S — Payment Date
+          row.amountRecovered, // T — Rent Amount Recovered through Challans
+          '', // U — Total Outstanding (manual)
+          row.remarks, // V — Remarks
         ],
       ]));
+      sink.write('\r\n');
       onRowCount?.call(count);
     }
     return count;
@@ -83,7 +97,6 @@ class CsvExport {
 
   /// Streams the CSV from [rows] into a temp file and opens the system
   /// share sheet so staff can send it via WhatsApp/email or save it.
-  /// Returns the final row count for the caller to display.
   static Future<int> shareCsv({
     required Stream<ExportRow> rows,
     required String reportLabel,
@@ -96,7 +109,6 @@ class CsvExport {
           '${reportLabel}_$periodLabel'.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
       final file = File('${dir.path}/$safeName.csv');
 
-      // Open the file for writing and stream the CSV into it.
       final sink = file.openWrite();
       try {
         final count = await writeCsvTo(
@@ -107,7 +119,6 @@ class CsvExport {
         await sink.flush();
         await sink.close();
 
-        // Nothing to share if the stream yielded no rows.
         if (count == 0) return 0;
 
         await SharePlus.instance.share(

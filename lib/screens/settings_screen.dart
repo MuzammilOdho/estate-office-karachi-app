@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/pocketbase_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_exception.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -44,16 +45,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _isSaving = true);
     final url = _urlController.text.trim();
 
-    await SettingsService.instance.setServerUrl(url);
-    await PocketBaseService.instance.updateBaseUrl(url);
+    try {
+      await SettingsService.instance.setServerUrl(url);
+      await PocketBaseService.instance.updateBaseUrl(url);
 
-    if (!mounted) return;
-    setState(() => _isSaving = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Server address saved.')),
-    );
-    Navigator.of(context).pop();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Server address saved.')),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e is AppException ? e.message : 'Could not save the server address.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   String? _validateUrl(String? value) {

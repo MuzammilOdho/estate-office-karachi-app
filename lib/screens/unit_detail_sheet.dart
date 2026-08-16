@@ -6,7 +6,6 @@ import '../models/allottee_model.dart';
 import '../models/unit_model.dart';
 import '../providers/auth_provider.dart';
 import '../repositories/allotments_repository.dart';
-import '../repositories/allottees_repository.dart';
 import '../repositories/units_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_exception.dart';
@@ -14,7 +13,6 @@ import '../widgets/allot_unit_form.dart';
 import '../widgets/allotted_unit_view.dart';
 import '../widgets/state_views.dart';
 import 'export_screen.dart';
-import 'record_payment_sheet.dart';
 import 'unit_allotment_history_screen.dart';
 
 /// The unit's current status is never read from a stored field — it's
@@ -33,7 +31,6 @@ class UnitDetailSheet extends StatefulWidget {
 class _UnitDetailSheetState extends State<UnitDetailSheet> {
   final _unitsRepository = UnitsRepository();
   final _allotmentsRepository = AllotmentsRepository();
-  final _allotteesRepository = AllotteesRepository();
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -56,18 +53,13 @@ class _UnitDetailSheetState extends State<UnitDetailSheet> {
 
     try {
       final unit = await _unitsRepository.getUnit(widget.unitId);
-      final allotment = await _allotmentsRepository.getActiveAllotmentForUnit(unit.id);
-
-      AllotteeModel? allottee;
-      if (allotment != null) {
-        allottee = await _allotteesRepository.getAllottee(allotment.allotteeId);
-      }
+      final active = await _allotmentsRepository.getActiveAllotmentForUnit(unit.id);
 
       if (!mounted) return;
       setState(() {
         _unit = unit;
-        _allotment = allotment;
-        _allottee = allottee;
+        _allotment = active?.allotment;
+        _allottee = active?.allottee;
         _isLoading = false;
       });
     } catch (e) {
@@ -77,22 +69,6 @@ class _UnitDetailSheetState extends State<UnitDetailSheet> {
         _isLoading = false;
       });
     }
-  }
-
-  void _openRecordPayment() {
-    final allotment = _allotment;
-    if (allotment == null) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => RecordPaymentSheet(
-        allotmentId: allotment.id,
-        unitLabel: _unit?.displayLabel ?? '',
-        allotteeName: _allottee?.name ?? '',
-      ),
-    ).then((_) => _load());
   }
 
   void _openExportHistory() {
@@ -215,8 +191,8 @@ class _UnitDetailSheetState extends State<UnitDetailSheet> {
             unitLabel: unit.displayLabel,
             allotment: allotment,
             allottee: allottee,
-            onRecordPayment: _openRecordPayment,
             onAllotteeModified: _load,
+            onAllotmentUpdated: _load,
             onVacated: _handleVacated,
           )
         else if (isAdmin)

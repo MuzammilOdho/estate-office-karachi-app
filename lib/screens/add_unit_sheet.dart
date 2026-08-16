@@ -148,6 +148,7 @@ class _AddUnitSheetState extends State<AddUnitSheet> {
       );
       Navigator.of(context).pop(true);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e is AppException ? e.message : 'Something went wrong.';
       });

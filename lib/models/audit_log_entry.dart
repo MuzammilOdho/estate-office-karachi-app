@@ -28,7 +28,7 @@ class AuditLogEntry {
 
   /// [record] should have been fetched with `expand: 'performed_by'`.
   factory AuditLogEntry.fromRecord(RecordModel record) {
-    final RecordModel? performedByRecord =
+    final performedByRecord =
     record.get<RecordModel>('expand.performed_by', null);
     final rawCreated = record.get<String>('created', '');
 
@@ -39,7 +39,7 @@ class AuditLogEntry {
       entityType: record.get<String>('entity_type', ''),
       entityId: record.get<String>('entity_id', ''),
       performedByName: UserDisplay.nameFromRecord(performedByRecord),
-      performedAt: rawCreated.isEmpty ? DateTime.now() : DateTime.parse(rawCreated),
+      performedAt: DateTime.tryParse(rawCreated) ?? DateTime.now(),
     );
   }
 }

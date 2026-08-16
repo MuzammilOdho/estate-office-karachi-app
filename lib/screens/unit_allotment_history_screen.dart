@@ -101,11 +101,12 @@ class _AllotmentCard extends StatelessWidget {
   final AllotmentWithAllottee item;
   const _AllotmentCard({required this.item});
 
+  static final _dateFormat = DateFormat('dd MMM yyyy');
+
   @override
   Widget build(BuildContext context) {
     final allotment = item.allotment;
     final allottee = item.allottee;
-    final dateFormat = DateFormat('dd MMM yyyy');
     final isActive = allotment.isActive;
 
     return Card(
@@ -114,9 +115,9 @@ class _AllotmentCard extends StatelessWidget {
         title: Text(allottee?.name ?? '(allottee record not found)'),
         subtitle: Text(
           isActive
-              ? 'Since ${dateFormat.format(allotment.dateOfAllotment)} · Current'
-              : '${dateFormat.format(allotment.dateOfAllotment)} – '
-                  '${allotment.dateOfVacancy != null ? dateFormat.format(allotment.dateOfVacancy!) : '?'}',
+              ? 'Since ${_dateFormat.format(allotment.dateOfAllotment)} · Current'
+              : '${_dateFormat.format(allotment.dateOfAllotment)} – '
+                  '${allotment.dateOfVacancy != null ? _dateFormat.format(allotment.dateOfVacancy!) : '?'}',
         ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

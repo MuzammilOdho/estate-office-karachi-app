@@ -165,7 +165,7 @@ class _ExportScreenState extends State<ExportScreen> {
       if (!mounted) return;
       if (rowCount == 0) {
         setState(() {
-          _errorMessage = 'No payments found for $_scopeLabel, $_periodLabel.';
+          _errorMessage = 'No data for $_scopeLabel, $_periodLabel.';
         });
         return;
       }
@@ -216,7 +216,7 @@ class _ExportScreenState extends State<ExportScreen> {
             if (_lastRowCount != null) ...[
               const SizedBox(height: 16),
               Text(
-                'Report generated with $_lastRowCount payment${_lastRowCount == 1 ? '' : 's'}. '
+                'Report generated with $_lastRowCount row${_lastRowCount == 1 ? '' : 's'}. '
                     'Choose where to save or send it from the share sheet.',
                 style: const TextStyle(color: AppColors.allottedGreen),
               ),

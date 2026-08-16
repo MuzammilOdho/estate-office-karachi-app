@@ -55,6 +55,7 @@ class _DateInputFieldState extends State<DateInputField> {
       lastDate: widget.lastDate,
     );
     if (picked != null) {
+      if (!mounted) return;
       _controller.text = _format.format(picked);
       widget.onChanged(picked);
     }

@@ -14,7 +14,6 @@ class Collections {
 class UserRole {
   UserRole._();
 
-  static const staff = 'staff';
   static const admin = 'admin';
 }
 

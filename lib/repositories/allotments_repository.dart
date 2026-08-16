@@ -20,12 +20,19 @@ class AllotmentsRepository {
 
   PocketBase get _pb => PocketBaseService.instance.client;
 
-  /// The active allotment for a unit, if any. An allotment is active
-  /// exactly when `date_of_vacancy` is empty — so we filter on that
-  /// server-side and ask for just the one matching row, instead of
-  /// fetching the unit's entire allotment history and picking through it
-  /// in Dart.
-  Future<AllotmentModel?> getActiveAllotmentForUnit(String unitId) async {
+  /// The active allotment for a unit, if any, with its allottee resolved
+  /// in the same query. An allotment is active exactly when
+  /// `date_of_vacancy` is empty — so we filter on that server-side and ask
+  /// for just the one matching row, instead of fetching the unit's entire
+  /// allotment history and picking through it in Dart.
+  ///
+  /// The `allottee` relation is optional on the `allotments` collection
+  /// (some historical records have none), so it's resolved via `expand`
+  /// rather than a separate getAllottee() round-trip — that older pattern
+  /// threw a 404 when `allotteeId` was empty, surfacing as "Something
+  /// went wrong" on affected units. The allottee here may legitimately be
+  /// null; callers should treat that as "allotted but allottee unknown".
+  Future<AllotmentWithAllottee?> getActiveAllotmentForUnit(String unitId) async {
     try {
       final result = await _pb.collection(Collections.allotments).getList(
         page: 1,
@@ -35,9 +42,16 @@ class AllotmentsRepository {
           {'unitId': unitId, 'empty': ''},
         ),
         sort: '-date_of_allotment',
+        expand: 'allottee',
       );
       if (result.items.isEmpty) return null;
-      return AllotmentModel.fromRecord(result.items.first);
+      final r = result.items.first;
+      final allotment = AllotmentModel.fromRecord(r);
+      final allotteeRecord = r.get<RecordModel?>('expand.allottee', null);
+      final allottee = allotteeRecord == null
+          ? null
+          : AllotteeModel.fromRecord(allotteeRecord);
+      return AllotmentWithAllottee(allotment, allottee);
     } catch (e) {
       throw asAppException(e);
     }
@@ -94,6 +108,17 @@ class AllotmentsRepository {
     String allotteeName = '',
   }) async {
     try {
+      // Guard against double-vacating, which would silently overwrite the
+      // original vacancy date and corrupt the historical record.
+      final existing = await _pb
+          .collection(Collections.allotments)
+          .getOne(allotmentId);
+      final alreadyVacated =
+          existing.get<String>('date_of_vacancy', '').isNotEmpty;
+      if (alreadyVacated) {
+        throw const AppException('This unit is already vacant.');
+      }
+
       await _pb.collection(Collections.allotments).update(allotmentId, body: {
         'date_of_vacancy': dateOfVacancy.toIso8601String(),
         if (_pb.authStore.record?.id != null) 'vacated_by': _pb.authStore.record!.id,
@@ -107,9 +132,46 @@ class AllotmentsRepository {
       entityType: Collections.allotments,
       entityId: allotmentId,
       summary:
-      '${unitLabel.isNotEmpty ? unitLabel : "Unit"} vacated'
-          '${allotteeName.isNotEmpty ? " ($allotteeName)" : ""}',
+          '${unitLabel.isNotEmpty ? unitLabel : "Unit"} vacated'
+              '${allotteeName.isNotEmpty ? " ($allotteeName)" : ""}',
     );
+  }
+
+  /// Corrects an existing allotment's date of allotment and/or date of
+  /// occupation. Used by the "Edit allotment dates" admin action when
+  /// the originally-entered dates were wrong. Logs an audit entry.
+  Future<AllotmentModel> updateAllotmentDates({
+    required String allotmentId,
+    required DateTime dateOfAllotment,
+    required DateTime dateOfOccupation,
+    String unitLabel = '',
+    String allotteeName = '',
+  }) async {
+    RecordModel record;
+    try {
+      record = await _pb.collection(Collections.allotments).update(
+        allotmentId,
+        body: {
+          'date_of_allotment': dateOfAllotment.toIso8601String(),
+          'date_of_occupation': dateOfOccupation.toIso8601String(),
+        },
+      );
+    } catch (e) {
+      throw asAppException(e);
+    }
+
+    final allotment = AllotmentModel.fromRecord(record);
+
+    await _auditLogRepository.logBestEffort(
+      action: 'allotment_dates_updated',
+      entityType: Collections.allotments,
+      entityId: allotmentId,
+      summary:
+          '${unitLabel.isNotEmpty ? unitLabel : "Unit"} allotment dates'
+              ' corrected${allotteeName.isNotEmpty ? " ($allotteeName)" : ""}',
+    );
+
+    return allotment;
   }
 
   /// Every allotment this unit has ever had — active and vacated — most

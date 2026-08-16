@@ -45,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // Nothing else to do — _RootRouter watches AuthProvider and swaps
       // to the Units List automatically once authStore becomes valid.
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e is AppException ? e.message : 'Something went wrong.';
       });
@@ -69,23 +70,32 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 24),
-                    Container(
-                      width: 72,
-                      height: 72,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: AppColors.inkNavy,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.apartment_rounded,
-                        color: AppColors.onInkNavy,
-                        size: 36,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'assets/logo.png',
+                        width: 96,
+                        height: 96,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stack) => Container(
+                          width: 96,
+                          height: 96,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: AppColors.inkNavy,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.apartment_rounded,
+                            color: AppColors.onInkNavy,
+                            size: 48,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'Estate Registry',
+                      'Estate Office Karachi',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),

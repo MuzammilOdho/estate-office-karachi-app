@@ -19,6 +19,17 @@ class Validators {
     return null;
   }
 
+  /// Phone is optional — if provided, it must be a valid Pakistan mobile
+  /// number (11 digits starting with 03).
+  static String? phone(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digitsOnly.length != 11 || !digitsOnly.startsWith('03')) {
+      return 'Enter a valid mobile no (e.g. 0300-1234567)';
+    }
+    return null;
+  }
+
   static String? positiveNumber(String? value, {String label = 'Amount'}) {
     if (value == null || value.trim().isEmpty) return '$label is required';
     final n = double.tryParse(value.trim());

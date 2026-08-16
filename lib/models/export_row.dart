@@ -1,43 +1,64 @@
-/// One row of an exported report — one row per payment, formatted to
-/// match the office's existing paper/Excel register layout: unit and
-/// occupant details repeated on every row, followed by the payment's
-/// date (split into Date/Month/Year, matching the register) and its
-/// Amount Due / Amount Recovered / Balance.
+/// One row of an exported report — one row per payment, with unit and
+/// occupant details repeated on every row. Columns match the office's
+/// Excel register layout (22 columns A–V).
+///
+/// Payment fields (`paymentDate`, `amountRecovered`, `remarks`) are nullable
+/// so that allotments with zero payments can still produce a row.
+///
+/// Date fields (`dateOfOccupation`, `dateOfAllotment`) are nullable so that
+/// vacant units (no allotments) can produce a row with blank date columns.
 class ExportRow {
-  final String unitLabel; // combined "Flat No./Quarter/House No." field
-  final String type;
-  final String colony; // "Location" in the register
-  final String allotteeName;
-  final String cnic;
-  final String designation;
-  final String department;
-  final DateTime dateOfAllotment;
-  final DateTime dateOfOccupation;
-  final DateTime? dob;
-  final DateTime paymentDate;
-  final String fy;
-  final double amountDue;
-  final double amountRecovered;
+  // --- Unit fields ---
+  final String type;       // B — Category / Type
+  final String houseNo;    // C — House No
+  final String block;       // D — Block No.
+  final String flatNo;      // E — Flat No
+  final String colony;      // F — Colony
+
+  // --- Allottee fields ---
+  final String personalNo;  // G — Personal No
+  final String allotteeName; // H — FGS Name
+  final String designation;  // I — FGS Designation
+  final String bs;          // J — BS
+  final String department;  // K — Department
+  final String cnic;        // L — FGS CNIC
+
+  // --- Allotment date fields (nullable for vacant units) ---
+  final DateTime? dateOfOccupation;  // M — Date Of Occupation
+  final DateTime? dateOfAllotment;   // N — Allotment Date
+  final DateTime? dob;               // O — Date Of Birth
+  final DateTime? dateOfRetirement;  // P — Date of Retirement (auto from DOB)
+
+  // --- Manual-entry columns (blank in CSV, filled in Excel) ---
+  // Q — Previous Outstanding Balance
+  // R — Demand of Current FY
+
+  // --- Payment fields (nullable for allotments with no payments) ---
+  final DateTime? paymentDate;       // S — Payment Date
+  final double amountRecovered;      // T — Rent Amount Recovered through Challans
+  final String remarks;              // V — Remarks
+
+  // --- Manual-entry column ---
+  // U — Total Outstanding
 
   const ExportRow({
-    required this.unitLabel,
     required this.type,
+    required this.houseNo,
+    required this.block,
+    required this.flatNo,
     required this.colony,
+    required this.personalNo,
     required this.allotteeName,
-    required this.cnic,
     required this.designation,
+    required this.bs,
     required this.department,
-    required this.dateOfAllotment,
-    required this.dateOfOccupation,
+    required this.cnic,
+    this.dateOfOccupation,
+    this.dateOfAllotment,
     this.dob,
-    required this.paymentDate,
-    required this.fy,
-    required this.amountDue,
-    required this.amountRecovered,
+    this.dateOfRetirement,
+    this.paymentDate,
+    this.amountRecovered = 0,
+    this.remarks = '',
   });
-
-  /// Amount Due minus Amount Recovered, for this payment only — not a
-  /// running/cumulative arrears balance across periods, since neither
-  /// PocketBase nor this app currently tracks a carried-forward balance.
-  double get balance => amountDue - amountRecovered;
 }

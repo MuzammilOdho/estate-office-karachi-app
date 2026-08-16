@@ -60,6 +60,7 @@ class _AllotUnitFormState extends State<AllotUnitForm> {
       if (!mounted) return;
       widget.onAllotted();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e is AppException ? e.message : 'Something went wrong.';
       });

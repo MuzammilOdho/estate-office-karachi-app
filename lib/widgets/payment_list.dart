@@ -7,7 +7,7 @@ import 'payment_tile.dart';
 
 /// A payment history with auto-load-more pagination.
 ///
-/// Both the unit detail sheet (current allotment) and the allotment
+/// Both the unit detail sheet (current allotment) and the allottee
 /// detail screen (read-only historical view) render a unit's payment
 /// history. They used to each fetch the entire history up front and
 /// render every tile; long-occupied units can have 200+ payments, so
@@ -23,15 +23,16 @@ import 'payment_tile.dart';
 /// [NotificationListener] — no [ScrollController] coupling, no nested
 /// scroll views. [loadPage] is `page -> Future<List<PaymentModel>>`,
 /// expected to throw [AppException] on failure (handled inline).
-/// [showAmountDue] is forwarded to [PaymentTile].
+///
+/// **Important:** Pass a new [Key] (e.g. `ValueKey(allotmentId)`) when
+/// the parent's data changes (new payment recorded, allottee modified)
+/// so the list resets and fetches fresh data.
 class PaymentList extends StatefulWidget {
   final Future<List<PaymentModel>> Function(int page) loadPage;
-  final bool showAmountDue;
 
   const PaymentList({
     super.key,
     required this.loadPage,
-    this.showAmountDue = false,
   });
 
   @override
@@ -114,7 +115,10 @@ class _PaymentListState extends State<PaymentList> {
             ),
           ] else ...[
             for (final p in _items)
-              PaymentTile(payment: p, showAmountDue: widget.showAmountDue),
+              PaymentTile(
+                key: ValueKey(p.id),
+                payment: p,
+              ),
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),

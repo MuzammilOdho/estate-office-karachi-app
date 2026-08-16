@@ -60,7 +60,7 @@ class AllotteeModificationModel {
         .map((f) => pb.files.getURL(record, f, token: fileToken).toString())
         .toList();
 
-    final RecordModel? changedByRecord =
+    final changedByRecord =
     record.get<RecordModel>('expand.changed_by', null);
 
     final rawCreated = record.get<String>('created', '');
@@ -72,7 +72,7 @@ class AllotteeModificationModel {
       documentUrls: documentUrls,
       remarks: record.get<String>('remarks', ''),
       changedByName: UserDisplay.nameFromRecord(changedByRecord),
-      changedAt: rawCreated.isEmpty ? DateTime.now() : DateTime.parse(rawCreated),
+      changedAt: DateTime.tryParse(rawCreated) ?? DateTime.now(),
     );
   }
 }

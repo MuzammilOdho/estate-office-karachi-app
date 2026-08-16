@@ -38,6 +38,7 @@ class DocumentPickerState extends State<DocumentPicker> {
         maxWidth: 1600,
       );
       if (photo != null) {
+        if (!mounted) return;
         setState(() => _documents.add(photo));
         widget.onChanged?.call(_documents);
       }
@@ -58,6 +59,7 @@ class DocumentPickerState extends State<DocumentPicker> {
     try {
       final photos = await _picker.pickMultiImage(imageQuality: 85);
       if (photos.isNotEmpty) {
+        if (!mounted) return;
         setState(() => _documents.addAll(photos));
         widget.onChanged?.call(_documents);
       }

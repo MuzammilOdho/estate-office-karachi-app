@@ -31,7 +31,6 @@ class _RecordPaymentSheetState extends State<RecordPaymentSheet> {
   final _imagePicker = ImagePicker();
 
   final _amountPaidController = TextEditingController();
-  final _amountDueController = TextEditingController(text: '0');
   final _challanNoController = TextEditingController();
   final _remarksController = TextEditingController();
 
@@ -45,7 +44,6 @@ class _RecordPaymentSheetState extends State<RecordPaymentSheet> {
   @override
   void dispose() {
     _amountPaidController.dispose();
-    _amountDueController.dispose();
     _challanNoController.dispose();
     _remarksController.dispose();
     super.dispose();
@@ -93,12 +91,10 @@ class _RecordPaymentSheetState extends State<RecordPaymentSheet> {
 
     try {
       final bytes = await photo.readAsBytes();
-      final amountDueText = _amountDueController.text.trim();
       await _paymentsRepository.createPayment(
         allotmentId: widget.allotmentId,
         date: _date!,
         amountPaid: double.parse(_amountPaidController.text.trim()),
-        amountDue: amountDueText.isEmpty ? 0 : double.parse(amountDueText),
         challanNo: _challanNoController.text,
         remarks: _remarksController.text,
         imageBytes: bytes,
@@ -112,6 +108,7 @@ class _RecordPaymentSheetState extends State<RecordPaymentSheet> {
       );
       Navigator.of(context).pop(true);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e is AppException ? e.message : 'Something went wrong.';
       });
@@ -181,21 +178,6 @@ class _RecordPaymentSheetState extends State<RecordPaymentSheet> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   style: AppTheme.numericData,
                   validator: (v) => Validators.positiveNumber(v, label: 'Amount paid'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _amountDueController,
-                  decoration: const InputDecoration(
-                    labelText: 'Amount due (optional)',
-                    helperText: 'Used only in exported reports.',
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: AppTheme.numericData,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return null;
-                    if (double.tryParse(v.trim()) == null) return 'Must be a number';
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

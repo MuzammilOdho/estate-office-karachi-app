@@ -15,9 +15,8 @@ import '../theme/app_theme.dart';
 /// has many payments.
 class PaymentTile extends StatelessWidget {
   final PaymentModel payment;
-  final bool showAmountDue;
 
-  const PaymentTile({super.key, required this.payment, this.showAmountDue = false});
+  const PaymentTile({super.key, required this.payment});
 
   @override
   Widget build(BuildContext context) {
@@ -48,8 +47,7 @@ class PaymentTile extends StatelessWidget {
           style: AppTheme.numericData.copyWith(fontSize: 13),
         ),
         subtitle: Text(
-          'Challan #${payment.challanNo} · Added by ${payment.addedByName}'
-              '${showAmountDue && payment.amountDue > 0 ? ' · Due: Rs. ${payment.amountDue.toStringAsFixed(0)}' : ''}',
+          'Challan #${payment.challanNo} · Added by ${payment.addedByName}',
         ),
         trailing: Text(
           'Rs. ${payment.amountPaid.toStringAsFixed(0)}',

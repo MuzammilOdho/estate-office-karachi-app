@@ -34,14 +34,14 @@ class PaymentModel {
   factory PaymentModel.fromRecord(RecordModel record, PocketBase pb) {
     final filename = record.get<String>('challan_image', '');
     final rawDate = record.get<String>('date', '');
-    final RecordModel? createdByRecord =
+    final createdByRecord =
     record.get<RecordModel>('expand.created_by', null);
 
     return PaymentModel(
       id: record.id,
       allotmentId: record.get<String>('allotment', ''),
       fy: record.get<String>('fy', ''),
-      date: rawDate.isEmpty ? DateTime.now() : DateTime.parse(rawDate),
+      date: DateTime.tryParse(rawDate) ?? DateTime.now(),
       amountPaid: record.get<double>('amount_paid', 0),
       amountDue: record.get<double>('amount_due', 0),
       challanNo: record.get<String>('challan_no', ''),

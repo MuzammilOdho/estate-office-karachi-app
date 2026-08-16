@@ -41,6 +41,7 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
   bool _isSearching = false;
   List<UnitListItem> _searchResults = [];
   bool _searchAttempted = false;
+  String? _searchError;
   /// Whether the search field is non-empty — used to toggle between the
   /// search-results and colony-list UI. Only triggers a rebuild when the
   /// empty ↔ non-empty transition actually happens, avoiding per-keystroke
@@ -91,6 +92,7 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
       setState(() {
         _searchResults = [];
         _searchAttempted = false;
+        _searchError = null;
       });
       return;
     }
@@ -101,11 +103,12 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
       setState(() {
         _searchResults = results;
         _searchAttempted = true;
+        _searchError = null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e is AppException ? e.message : 'Something went wrong.';
+        _searchError = e is AppException ? e.message : 'Something went wrong.';
       });
     } finally {
       if (mounted) setState(() => _isSearching = false);
@@ -131,7 +134,7 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Estate Registry'),
+        title: const Text('Estate Office Karachi'),
         actions: [
           IconButton(
             tooltip: 'Export report',
@@ -179,7 +182,7 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
                   _onSearchChanged(value);
                 },
                 decoration: InputDecoration(
-                  hintText: 'Search house no, allottee name, or CNIC',
+                  hintText: 'Search house no, name, CNIC, personal no, or phone',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _isSearching
                       ? const Padding(
@@ -198,6 +201,7 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
                       setState(() {
                         _searchResults = [];
                         _searchAttempted = false;
+                        _searchError = null;
                       });
                     },
                   )
@@ -227,13 +231,22 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
   }
 
   Widget _buildSearchResults() {
+    if (_searchError != null && !_isSearching) {
+      return ErrorRetryView(
+        message: _searchError!,
+        onRetry: () {
+          setState(() => _searchError = null);
+          _runSearch(_searchController.text);
+        },
+      );
+    }
     if (_searchResults.isEmpty) {
       if (_isSearching) return const LoadingView();
       if (_searchAttempted) {
         return const EmptyStateView(
           icon: Icons.search_off_rounded,
           title: 'No matches',
-          subtitle: 'Try a different house no, name, or CNIC.',
+          subtitle: 'Try a different house no, name, CNIC, personal no, or phone.',
         );
       }
       return const SizedBox.shrink();

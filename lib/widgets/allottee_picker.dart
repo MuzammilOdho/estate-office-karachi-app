@@ -41,6 +41,8 @@ class AllotteePickerState extends State<AllotteePicker> {
   final _designationController = TextEditingController();
   final _departmentController = TextEditingController();
   final _bsController = TextEditingController();
+  final _personalNoController = TextEditingController();
+  final _phoneController = TextEditingController();
   DateTime? _dob;
 
   String? _errorMessage;
@@ -55,6 +57,8 @@ class AllotteePickerState extends State<AllotteePicker> {
     _designationController.dispose();
     _departmentController.dispose();
     _bsController.dispose();
+    _personalNoController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -106,16 +110,45 @@ class AllotteePickerState extends State<AllotteePicker> {
 
     setState(() => _isCreating = true);
     try {
+      // Duplicate prevention: check CNIC, personal_no, phone.
+      for (final entry in [
+        MapEntry('cnic', _cnicController.text),
+        MapEntry('personal_no', _personalNoController.text),
+        MapEntry('phone', _phoneController.text),
+      ]) {
+        final conflict = await _allotteesRepository.findByExactField(
+          field: entry.key,
+          value: entry.value,
+        );
+        if (conflict != null) {
+          final label = entry.key == 'cnic'
+              ? 'CNIC'
+              : entry.key == 'personal_no'
+                  ? 'Personal No'
+                  : 'Phone No';
+          if (mounted) {
+            setState(() {
+              _errorMessage = '$label already exists (used by "$conflict").';
+              _isCreating = false;
+            });
+          }
+          return null;
+        }
+      }
+
       final created = await _allotteesRepository.createAllottee(
         name: _nameController.text,
         cnic: _cnicController.text,
         designation: _designationController.text,
         department: _departmentController.text,
         bs: _bsController.text,
+        personalNo: _personalNoController.text,
+        phone: _phoneController.text,
         dob: _dob,
       );
       return created.id;
     } catch (e) {
+      if (!mounted) return null;
       setState(() {
         _errorMessage = e is AppException ? e.message : 'Something went wrong.';
       });
@@ -262,6 +295,22 @@ class AllotteePickerState extends State<AllotteePicker> {
             keyboardType: TextInputType.number,
             inputFormatters: [CnicInputFormatter()],
             validator: Validators.cnic,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _personalNoController,
+            decoration: const InputDecoration(labelText: 'Personal No (optional)'),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _phoneController,
+            decoration: const InputDecoration(
+              labelText: 'Mobile No (optional)',
+              hintText: '0300-1234567',
+            ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [PhoneInputFormatter()],
+            validator: Validators.phone,
           ),
           const SizedBox(height: 12),
           TextFormField(

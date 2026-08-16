@@ -3,9 +3,11 @@ import 'package:intl/intl.dart';
 
 import '../models/allottee_model.dart';
 import '../repositories/allottee_modifications_repository.dart';
+import '../repositories/allottees_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_exception.dart';
 import '../utils/input_formatters.dart';
+import '../utils/validators.dart';
 import '../widgets/date_input_field.dart';
 import '../widgets/document_picker.dart';
 
@@ -20,6 +22,7 @@ class ModifyAllotteeSheet extends StatefulWidget {
 class _ModifyAllotteeSheetState extends State<ModifyAllotteeSheet> {
   final _formKey = GlobalKey<FormState>();
   final _modificationsRepository = AllotteeModificationsRepository();
+  final _allotteesRepository = AllotteesRepository();
   final _documentPickerKey = GlobalKey<DocumentPickerState>();
 
   late final _nameController = TextEditingController(text: widget.allottee.name);
@@ -29,6 +32,10 @@ class _ModifyAllotteeSheetState extends State<ModifyAllotteeSheet> {
   late final _departmentController =
   TextEditingController(text: widget.allottee.department);
   late final _bsController = TextEditingController(text: widget.allottee.bs);
+  late final _personalNoController =
+  TextEditingController(text: widget.allottee.personalNo);
+  late final _phoneController =
+  TextEditingController(text: widget.allottee.phone);
   late DateTime? _dob = widget.allottee.dob;
 
   final _remarksController = TextEditingController();
@@ -45,6 +52,8 @@ class _ModifyAllotteeSheetState extends State<ModifyAllotteeSheet> {
     _designationController.dispose();
     _departmentController.dispose();
     _bsController.dispose();
+    _personalNoController.dispose();
+    _phoneController.dispose();
     _remarksController.dispose();
     super.dispose();
   }
@@ -69,6 +78,32 @@ class _ModifyAllotteeSheetState extends State<ModifyAllotteeSheet> {
 
     try {
       final original = widget.allottee;
+
+      // Duplicate prevention: check CNIC, personal_no, phone (exclude self).
+      for (final entry in [
+        MapEntry('cnic', _cnicController.text),
+        MapEntry('personal_no', _personalNoController.text),
+        MapEntry('phone', _phoneController.text),
+      ]) {
+        final conflict = await _allotteesRepository.findByExactField(
+          field: entry.key,
+          value: entry.value,
+          excludeId: original.id,
+        );
+        if (conflict != null) {
+          final label = entry.key == 'cnic'
+              ? 'CNIC'
+              : entry.key == 'personal_no'
+                  ? 'Personal No'
+                  : 'Phone No';
+          if (!mounted) return;
+          setState(() {
+            _errorMessage = '$label already exists (used by "$conflict").';
+          });
+          return;
+        }
+      }
+
       final edits = [
         AllotteeFieldEdit(
           label: 'Name',
@@ -96,6 +131,16 @@ class _ModifyAllotteeSheetState extends State<ModifyAllotteeSheet> {
           newValue: _bsController.text.trim(),
         ),
         AllotteeFieldEdit(
+          label: 'Personal No',
+          oldValue: original.personalNo,
+          newValue: _personalNoController.text.trim(),
+        ),
+        AllotteeFieldEdit(
+          label: 'Mobile No',
+          oldValue: original.phone,
+          newValue: _phoneController.text.trim(),
+        ),
+        AllotteeFieldEdit(
           label: 'Date of birth',
           oldValue: _dobDisplay(original.dob),
           newValue: _dobDisplay(_dob),
@@ -108,6 +153,8 @@ class _ModifyAllotteeSheetState extends State<ModifyAllotteeSheet> {
         'designation': _designationController.text.trim(),
         'department': _departmentController.text.trim(),
         'bs': _bsController.text.trim(),
+        'personal_no': _personalNoController.text.trim(),
+        'phone': _phoneController.text.trim(),
         'dob': _dob?.toIso8601String() ?? '',
       };
 
@@ -133,6 +180,7 @@ class _ModifyAllotteeSheetState extends State<ModifyAllotteeSheet> {
       );
       Navigator.of(context).pop(true);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e is AppException ? e.message : 'Something went wrong.';
       });
@@ -213,6 +261,22 @@ class _ModifyAllotteeSheetState extends State<ModifyAllotteeSheet> {
                 TextFormField(
                   controller: _bsController,
                   decoration: const InputDecoration(labelText: 'BS (basic scale)'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _personalNoController,
+                  decoration: const InputDecoration(labelText: 'Personal No'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Mobile No',
+                    hintText: '0300-1234567',
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [PhoneInputFormatter()],
+                  validator: Validators.phone,
                 ),
                 const SizedBox(height: 12),
                 DateInputField(

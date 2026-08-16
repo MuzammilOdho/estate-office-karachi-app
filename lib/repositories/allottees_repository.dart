@@ -25,15 +25,6 @@ class AllotteesRepository {
     }
   }
 
-  Future<AllotteeModel> getAllottee(String id) async {
-    try {
-      final record = await _pb.collection(Collections.allottees).getOne(id);
-      return AllotteeModel.fromRecord(record);
-    } catch (e) {
-      throw asAppException(e);
-    }
-  }
-
   /// CNIC and DOB are optional here — a lot of historical records won't
   /// have them yet and staff fill them in later via "Modify allottee
   /// info" once they have paperwork to verify against.
@@ -43,6 +34,8 @@ class AllotteesRepository {
     String designation = '',
     String department = '',
     String bs = '',
+    String personalNo = '',
+    String phone = '',
     DateTime? dob,
   }) async {
     try {
@@ -52,12 +45,45 @@ class AllotteesRepository {
         'designation': designation.trim(),
         'department': department.trim(),
         'bs': bs.trim(),
+        'personal_no': personalNo.trim(),
+        'phone': phone.trim(),
         'dob': dob?.toIso8601String() ?? '',
         if (_pb.authStore.record?.id != null) 'created_by': _pb.authStore.record!.id,
       });
       return AllotteeModel.fromRecord(record);
     } catch (e) {
       throw asAppException(e);
+    }
+  }
+
+  /// Checks whether any allottee (other than [excludeId]) already has an
+  /// exact match on [field]. Returns the conflicting allottee's name, or
+  /// null if no conflict exists. Used for client-side duplicate prevention
+  /// before create / update.
+  Future<String?> findByExactField({
+    required String field,
+    required String value,
+    String? excludeId,
+  }) async {
+    if (value.trim().isEmpty) return null;
+    try {
+      final parts = <String>['$field = {:value}'];
+      final params = <String, dynamic>{'value': value.trim()};
+      if (excludeId != null && excludeId.isNotEmpty) {
+        parts.add('id != {:excludeId}');
+        params['excludeId'] = excludeId;
+      }
+      final result = await _pb.collection(Collections.allottees).getList(
+            page: 1,
+            perPage: 1,
+            filter: _pb.filter(parts.join(' && '), params),
+          );
+      if (result.items.isEmpty) return null;
+      return result.items.first.get<String>('name', '');
+    } catch (_) {
+      // If the query fails (e.g. index doesn't exist yet), don't block
+      // the operation — the server may enforce uniqueness separately.
+      return null;
     }
   }
 

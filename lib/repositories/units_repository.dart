@@ -113,21 +113,11 @@ class UnitsRepository {
       // related unit's fields (a search by house no should also find an
       // allotted unit via its allotment). unit.* / allottee.* are
       // PocketBase relation-chain filters, already used by ExportRepository.
-      final allotmentsPage =
-          await _pb.collection(Collections.allotments).getList(
-        page: 1,
-        perPage: _searchPageSize,
-        filter: _pb.filter(
-          'date_of_vacancy = {:empty} && ('
-              'unit.house_no ~ {:q} || unit.block ~ {:q} || '
-              'unit.flat_no ~ {:q} || unit.colony ~ {:q} || unit.type ~ {:q} || '
-              'allottee.name ~ {:q} || allottee.cnic ~ {:q} || '
-              'allottee.designation ~ {:q} || allottee.department ~ {:q}'
-              ')',
-          {'empty': '', 'q': query.trim()},
-        ),
-        expand: 'allottee, unit',
-      );
+      //
+      // personal_no and phone were added later and may not exist on the
+      // server yet — try the full filter first, then fall back without them.
+      var allotmentsPage = await _searchAllotments(query);
+
 
       // Build the union keyed by unit id so a unit matched by both
       // queries isn't listed twice. Allotment-sourced rows carry the
@@ -147,6 +137,8 @@ class UnitsRepository {
           allotteeCnic: allotteeRecord?.get<String>('cnic', ''),
           allotteeDesignation: allotteeRecord?.get<String>('designation', ''),
           allotteeDepartment: allotteeRecord?.get<String>('department', ''),
+          allotteePersonalNo: allotteeRecord?.get<String>('personal_no', ''),
+          allotteePhone: allotteeRecord?.get<String>('phone', ''),
         );
       }
       for (final r in unitsPage.items) {
@@ -171,6 +163,45 @@ class UnitsRepository {
     }
   }
 
+  /// Fetches active allotments matching the query across unit + allottee
+  /// fields. Tries the full filter (including `personal_no` and `phone`)
+  /// first; if the server doesn't have those fields yet, falls back to
+  /// the core filter so search never breaks.
+  Future<ResultList<RecordModel>> _searchAllotments(String query) async {
+    try {
+      return await _pb.collection(Collections.allotments).getList(
+        page: 1,
+        perPage: _searchPageSize,
+        filter: _pb.filter(
+          'date_of_vacancy = {:empty} && ('
+              'unit.house_no ~ {:q} || unit.block ~ {:q} || '
+              'unit.flat_no ~ {:q} || unit.colony ~ {:q} || unit.type ~ {:q} || '
+              'allottee.name ~ {:q} || allottee.cnic ~ {:q} || '
+              'allottee.designation ~ {:q} || allottee.department ~ {:q} || '
+              'allottee.personal_no ~ {:q} || allottee.phone ~ {:q}'
+              ')',
+          {'empty': '', 'q': query.trim()},
+        ),
+        expand: 'allottee, unit',
+      );
+    } catch (_) {
+      return await _pb.collection(Collections.allotments).getList(
+        page: 1,
+        perPage: _searchPageSize,
+        filter: _pb.filter(
+          'date_of_vacancy = {:empty} && ('
+              'unit.house_no ~ {:q} || unit.block ~ {:q} || '
+              'unit.flat_no ~ {:q} || unit.colony ~ {:q} || unit.type ~ {:q} || '
+              'allottee.name ~ {:q} || allottee.cnic ~ {:q} || '
+              'allottee.designation ~ {:q} || allottee.department ~ {:q}'
+              ')',
+          {'empty': '', 'q': query.trim()},
+        ),
+        expand: 'allottee, unit',
+      );
+    }
+  }
+
   /// Lower is a better match: 0 = exact match on an identifying field,
   /// 1 = a field starts with the query, 2 = a field just contains it
   /// somewhere. Returns null (no match) if nothing matches at all.
@@ -185,6 +216,8 @@ class UnitsRepository {
       (item.allotteeCnic ?? '').toLowerCase(),
       (item.allotteeDesignation ?? '').toLowerCase(),
       (item.allotteeDepartment ?? '').toLowerCase(),
+      (item.allotteePersonalNo ?? '').toLowerCase(),
+      (item.allotteePhone ?? '').toLowerCase(),
     ];
 
     var best = 3; // 3 = "no match" sentinel, filtered out below
@@ -216,30 +249,60 @@ class UnitsRepository {
   /// Joins a list of unit records with their active allotment (a unit has
   /// one active allotment at most — enforced on the server, see the
   /// backend handover notes) and that allotment's allottee. Scoped to only
-  /// the given units via the `?=` ("any-in") operator, so this never
-  /// transfers the estate-wide active-allotment table — the previous
-  /// implementation fetched every active allotment regardless of which
-  /// units were asked for.
+  /// the given units so this never transfers the estate-wide active-
+  /// allotment table.
+  ///
+  /// PocketBase's `?=` operator checks if *any element of the left-hand
+  /// array field* equals a single scalar on the right — it is NOT an
+  /// "IN list" operator and cannot accept a Dart List as a placeholder
+  /// value, so we build `unit = 'id1' || unit = 'id2' || …` manually.
+  /// IDs are chunked into batches of [_idBatchSize] because the filter is
+  /// sent as a GET query parameter — a few hundred IDs would produce a URL
+  /// too long for the server (HTTP 414 / parser failure), which surfaced
+  /// as "Something went wrong" on colonies with many units.
+  static const _idBatchSize = 40;
+
   Future<List<UnitListItem>> _joinUnitsWithActiveAllotmentsFor(
       List<RecordModel> unitRecords,
       ) async {
     final unitIds = [for (final r in unitRecords) r.id];
     if (unitIds.isEmpty) {
-      return unitRecords.map((r) => UnitListItem(unit: UnitModel.fromRecord(r))).toList();
+      return unitRecords
+          .map((r) => UnitListItem(unit: UnitModel.fromRecord(r)))
+          .toList();
     }
 
-    final activeAllotmentRecords =
-    await _pb.collection(Collections.allotments).getFullList(
-      filter: _pb.filter(
-        'date_of_vacancy = {:empty} && unit ?= {:ids}',
-        {'empty': '', 'ids': unitIds},
-      ),
-      expand: 'allottee',
-    );
-
     final allotmentByUnit = <String, RecordModel>{};
-    for (final r in activeAllotmentRecords) {
-      allotmentByUnit[r.get<String>('unit', '')] = r;
+
+    // Chunk IDs to keep each request URL short. For each batch, build an
+    // OR-filter and paginate until that batch's matches are exhausted.
+    for (var i = 0; i < unitIds.length; i += _idBatchSize) {
+      final end = (i + _idBatchSize < unitIds.length)
+          ? i + _idBatchSize
+          : unitIds.length;
+      final batch = unitIds.sublist(i, end);
+
+      final orParts = batch.map((id) => "unit = '$id'").join(' || ');
+      final filter = _pb.filter(
+        'date_of_vacancy = {:empty} && ($orParts)',
+        {'empty': ''},
+      );
+
+      int page = 1;
+      const perPage = 500;
+      while (true) {
+        final result = await _pb.collection(Collections.allotments).getList(
+              page: page,
+              perPage: perPage,
+              filter: filter,
+              expand: 'allottee',
+            );
+        for (final r in result.items) {
+          allotmentByUnit[r.get<String>('unit', '')] = r;
+        }
+        if (page * perPage >= result.totalItems) break;
+        page++;
+      }
     }
 
     return unitRecords.map((r) {
@@ -250,8 +313,7 @@ class UnitsRepository {
       }
 
       final allotment = AllotmentModel.fromRecord(allotmentRecord);
-      final RecordModel? allotteeRecord =
-      allotmentRecord.get<RecordModel?>('expand.allottee', null);
+      final allotteeRecord = allotmentRecord.get<RecordModel?>('expand.allottee');
 
       return UnitListItem(
         unit: unit,
@@ -260,6 +322,8 @@ class UnitsRepository {
         allotteeCnic: allotteeRecord?.get<String>('cnic', ''),
         allotteeDesignation: allotteeRecord?.get<String>('designation', ''),
         allotteeDepartment: allotteeRecord?.get<String>('department', ''),
+        allotteePersonalNo: allotteeRecord?.get<String>('personal_no', ''),
+        allotteePhone: allotteeRecord?.get<String>('phone', ''),
       );
     }).toList();
   }

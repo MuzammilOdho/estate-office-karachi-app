@@ -9,6 +9,10 @@ import 'package:intl/intl.dart';
 /// string comparison, not a real date comparison. Any date used inside
 /// a filter string (not a create/update body) must go through this.
 String pbFilterDate(DateTime dt) {
-  final formatted = DateFormat('yyyy-MM-dd HH:mm:ss.SSS').format(dt);
+  // Format in UTC so the trailing 'Z' is truthful — otherwise we'd be
+  // declaring a local-midnight instant as UTC, which shifts the bound by
+  // the device's UTC offset (5 hours in Pakistan) and can select the
+  // wrong month's payments near a month boundary.
+  final formatted = DateFormat('yyyy-MM-dd HH:mm:ss.SSS').format(dt.toUtc());
   return '${formatted}Z';
 }
