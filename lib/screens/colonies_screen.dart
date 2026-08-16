@@ -13,6 +13,7 @@ import '../widgets/unit_card.dart';
 import 'add_unit_sheet.dart';
 import 'audit_log_screen.dart';
 import 'export_screen.dart';
+import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'types_screen.dart';
 import 'unit_detail_sheet.dart';
@@ -42,6 +43,11 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
   List<UnitListItem> _searchResults = [];
   bool _searchAttempted = false;
   String? _searchError;
+  /// Monotonic token guarding against out-of-order search responses: if
+  /// a newer keystroke re-searches before an older (slower) query
+  /// finishes, the older result is dropped instead of overwriting the
+  /// newer one.
+  int _searchSeq = 0;
   /// Whether the search field is non-empty — used to toggle between the
   /// search-results and colony-list UI. Only triggers a rebuild when the
   /// empty ↔ non-empty transition actually happens, avoiding per-keystroke
@@ -88,6 +94,7 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
   }
 
   Future<void> _runSearch(String query) async {
+    final seq = ++_searchSeq;
     if (query.trim().isEmpty) {
       setState(() {
         _searchResults = [];
@@ -99,19 +106,19 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
     setState(() => _isSearching = true);
     try {
       final results = await _unitsRepository.searchAllUnits(query);
-      if (!mounted) return;
+      if (!mounted || seq != _searchSeq) return;
       setState(() {
         _searchResults = results;
         _searchAttempted = true;
         _searchError = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || seq != _searchSeq) return;
       setState(() {
         _searchError = e is AppException ? e.message : 'Something went wrong.';
       });
     } finally {
-      if (mounted) setState(() => _isSearching = false);
+      if (mounted && seq == _searchSeq) setState(() => _isSearching = false);
     }
   }
 
@@ -136,6 +143,13 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
       appBar: AppBar(
         title: const Text('Estate Office Karachi'),
         actions: [
+          IconButton(
+            tooltip: 'Advanced search',
+            icon: const Icon(Icons.filter_alt_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SearchScreen()),
+            ),
+          ),
           IconButton(
             tooltip: 'Export report',
             icon: const Icon(Icons.ios_share_rounded),

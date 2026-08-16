@@ -195,6 +195,15 @@ class _UnitDetailSheetState extends State<UnitDetailSheet> {
             onAllotmentUpdated: _load,
             onVacated: _handleVacated,
           )
+        else if (allotment != null)
+          // Rare historical-data state: an active allotment whose
+          // allottee relation is empty. Falling through to the allot form
+          // (the old behaviour) was misleading — submitting it just failed
+          // with "already has an active allotment".
+          const _AdminOnlyNotice(
+            message: 'This unit has an active allotment without a linked '
+                'allottee record. Please correct this record.',
+          )
         else if (isAdmin)
           AllotUnitForm(
             unitId: unit.id,
