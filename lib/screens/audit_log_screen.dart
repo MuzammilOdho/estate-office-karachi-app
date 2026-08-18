@@ -89,7 +89,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
           );
         }
         return RefreshIndicator(
-          color: AppColors.brass,
+          color: AppColors.primary,
           onRefresh: _load,
           child: ListView.separated(
             padding: const EdgeInsets.all(16),
@@ -100,7 +100,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               return Card(
                 margin: EdgeInsets.zero,
                 child: ListTile(
-                  leading: Icon(_iconFor(entry.action), color: AppColors.brass),
+                  leading: Icon(_iconFor(entry.action), color: AppColors.primary),
                   title: Text(entry.summary),
                   subtitle: Text(
                     '${entry.performedByName} · '

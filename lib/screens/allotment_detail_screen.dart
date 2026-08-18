@@ -54,17 +54,17 @@ class _AllotmentDetailScreenState extends State<AllotmentDetailScreen> {
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.vacantGray.withValues(alpha: 0.1),
+                  color: AppColors.textSecondary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.info_outline, size: 18, color: AppColors.vacantGray),
+                    Icon(Icons.info_outline, size: 18, color: AppColors.textSecondary),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'This allotment has ended. This view is read-only.',
-                        style: TextStyle(color: AppColors.vacantGray, fontSize: 13),
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                       ),
                     ),
                   ],
@@ -128,7 +128,7 @@ class _InfoRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 130,
-            child: Text(label, style: const TextStyle(color: AppColors.vacantGray)),
+            child: Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           ),
           Expanded(
             child: Text(value, style: monospace ? AppTheme.numericData : null),

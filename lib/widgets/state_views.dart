@@ -12,10 +12,10 @@ class LoadingView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CircularProgressIndicator(color: AppColors.brass),
+          const CircularProgressIndicator(color: AppColors.primary),
           if (message != null) ...[
             const SizedBox(height: 16),
-            Text(message!, style: const TextStyle(color: AppColors.vacantGray)),
+            Text(message!, style: const TextStyle(color: AppColors.textSecondary)),
           ],
         ],
       ),
@@ -48,9 +48,9 @@ class ErrorRetryView extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.inkNavy, fontSize: 15),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
@@ -83,7 +83,7 @@ class EmptyStateView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: AppColors.vacantGray),
+            Icon(icon, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -95,7 +95,7 @@ class EmptyStateView extends StatelessWidget {
               Text(
                 subtitle!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.vacantGray),
+                style: const TextStyle(color: AppColors.textSecondary),
               ),
             ],
           ],

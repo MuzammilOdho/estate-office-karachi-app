@@ -82,7 +82,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Server settings')),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.brass))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(
@@ -94,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'This is the address of the PocketBase server running on '
                     'the office PC. Only change this if the office PC\'s '
                     'network address has changed.',
-                style: TextStyle(color: AppColors.vacantGray),
+                style: TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 20),
               TextFormField(

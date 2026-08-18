@@ -270,7 +270,7 @@ class AllotteePickerState extends State<AllotteePicker> {
             padding: EdgeInsets.only(top: 8),
             child: Text(
               'No matches. Switch to "New allottee" if they\'re not on record yet.',
-              style: TextStyle(color: AppColors.vacantGray, fontSize: 13),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
           ),
         ],
@@ -342,7 +342,7 @@ class AllotteePickerState extends State<AllotteePicker> {
           ),
           if (_isCreating) ...[
             const SizedBox(height: 10),
-            const LinearProgressIndicator(color: AppColors.brass),
+            const LinearProgressIndicator(color: AppColors.primary),
           ],
         ],
       ),

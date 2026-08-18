@@ -103,7 +103,7 @@ class DocumentPickerState extends State<DocumentPicker> {
         ),
         if (_isPicking) ...[
           const SizedBox(height: 8),
-          const LinearProgressIndicator(color: AppColors.brass),
+          const LinearProgressIndicator(color: AppColors.primary),
         ],
         if (_errorMessage != null) ...[
           const SizedBox(height: 8),
@@ -123,7 +123,7 @@ class DocumentPickerState extends State<DocumentPicker> {
           const SizedBox(height: 8),
           const Text(
             'No documents attached yet.',
-            style: TextStyle(color: AppColors.vacantGray, fontSize: 13),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
         ],
       ],

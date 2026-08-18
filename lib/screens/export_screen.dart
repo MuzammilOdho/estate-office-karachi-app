@@ -263,7 +263,7 @@ class _ExportScreenState extends State<ExportScreen> {
         return const SizedBox.shrink();
       case ExportScope.colony:
         return _isLoadingColonies
-            ? const LinearProgressIndicator(color: AppColors.brass)
+            ? const LinearProgressIndicator(color: AppColors.primary)
             : DropdownButtonFormField<String>(
           initialValue: _selectedColony,
           decoration: const InputDecoration(labelText: 'Colony'),
@@ -394,7 +394,7 @@ class _ExportScreenState extends State<ExportScreen> {
       case ExportPeriod.allTime:
         return const Text(
           'Every payment on record for this unit, oldest to newest.',
-          style: TextStyle(color: AppColors.vacantGray, fontSize: 13),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
         );
     }
   }

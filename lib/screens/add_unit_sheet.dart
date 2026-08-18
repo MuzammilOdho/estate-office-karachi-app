@@ -190,7 +190,7 @@ class _AddUnitSheetState extends State<AddUnitSheet> {
                 if (_isLoadingDropdowns)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: CircularProgressIndicator(color: AppColors.brass)),
+                    child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
                   )
                 else ...[
                   _buildColonyField(),

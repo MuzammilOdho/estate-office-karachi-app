@@ -127,7 +127,7 @@ class _PaymentListState extends State<PaymentList> {
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppColors.brass),
+                        strokeWidth: 2, color: AppColors.primary),
                   ),
                 ),
               )
@@ -151,7 +151,7 @@ class _PaymentListState extends State<PaymentList> {
                 child: Center(
                   child: Text(
                     'No more payments',
-                    style: TextStyle(color: AppColors.vacantGray, fontSize: 13),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   ),
                 ),
               ),

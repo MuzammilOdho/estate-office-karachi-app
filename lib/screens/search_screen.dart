@@ -275,7 +275,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ? '$_totalItems matches — showing the first ${_results.length}. '
                   'Refine the filters to narrow down.'
               : '${_results.length} ${_results.length == 1 ? 'unit' : 'units'} found',
-          style: const TextStyle(color: AppColors.vacantGray, fontSize: 13),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 8),
         for (final item in _results)
@@ -348,14 +348,14 @@ class _ResultCardState extends State<_ResultCard> {
                   const SizedBox(width: 4),
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
-                    color: AppColors.vacantGray,
+                    color: AppColors.textSecondary,
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
                 '${unit.colony} · ${unit.type}',
-                style: const TextStyle(color: AppColors.vacantGray, fontSize: 13),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
               if ((item.allotteeName ?? '').isNotEmpty) ...[
                 const SizedBox(height: 6),
@@ -417,7 +417,7 @@ class _ResultCardState extends State<_ResultCard> {
         const SizedBox(height: 8),
         const Text(
           'Vacant — no allotment on record.',
-          style: TextStyle(color: AppColors.vacantGray, fontSize: 13),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
       ],
       const SizedBox(height: 8),
@@ -472,7 +472,7 @@ class _Row extends StatelessWidget {
         children: [
           SizedBox(
             width: 110,
-            child: Text(label, style: const TextStyle(color: AppColors.vacantGray)),
+            child: Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           ),
           Expanded(
             child: Text(value, style: mono ? AppTheme.numericData : null),

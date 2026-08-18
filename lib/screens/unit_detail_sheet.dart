@@ -228,15 +228,15 @@ class _AdminOnlyNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.vacantGray.withValues(alpha: 0.1),
+        color: AppColors.textSecondary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
-          const Icon(Icons.lock_outline, size: 18, color: AppColors.vacantGray),
+          const Icon(Icons.lock_outline, size: 18, color: AppColors.textSecondary),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(message, style: const TextStyle(color: AppColors.vacantGray)),
+            child: Text(message, style: const TextStyle(color: AppColors.textSecondary)),
           ),
         ],
       ),
@@ -259,7 +259,7 @@ class _InfoRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 90,
-            child: Text(label, style: const TextStyle(color: AppColors.vacantGray)),
+            child: Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           ),
           Expanded(
             child: Text(
