@@ -9,7 +9,7 @@ import '../theme/app_theme.dart';
 class AppLogo extends StatelessWidget {
   final double size;
 
-  const AppLogo({super.key, this.size = 80});
+  const AppLogo({super.key, this.size = 100});
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +48,7 @@ class AppBrandHeader extends StatelessWidget {
 
   const AppBrandHeader({
     super.key,
-    this.logoSize = 72,
+    this.logoSize = 96,
     this.padding = const EdgeInsets.fromLTRB(24, 16, 24, 8),
   });
 

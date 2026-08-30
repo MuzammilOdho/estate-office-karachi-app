@@ -75,9 +75,10 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 80,
         title: const Row(
           children: [
-            AppLogo(size: 32),
+            AppLogo(size: 72),
             SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -165,8 +166,8 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
       case _LoadState.loaded:
         if (_colonies.isEmpty) {
           return const EmptyStateView(
-            icon: Icons.location_city_outlined,
-            title: 'No colonies yet',
+            icon: Icons.map_outlined,
+            title: 'No areas yet',
             subtitle: 'Tap the + button to add the first unit.',
           );
         }
@@ -181,7 +182,7 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
                 return Padding(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
                   child: Text(
-                    'Colony',
+                    'Areas',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -189,28 +190,27 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
                 );
               }
               final colony = _colonies[index - 1];
-              return ListTile(
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryContainer,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.location_city_outlined,
-                    color: AppColors.primary,
+              return Card(
+                elevation: 0,
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.1),
                   ),
                 ),
-                title: Text(
-                  colony,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => TypesScreen(colony: colony),
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  title: Text(
+                    colony,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TypesScreen(colony: colony),
+                    ),
                   ),
                 ),
               );
