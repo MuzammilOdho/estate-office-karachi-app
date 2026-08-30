@@ -84,7 +84,7 @@ class _UnitAllotmentHistoryScreenState extends State<UnitAllotmentHistoryScreen>
           );
         }
         return RefreshIndicator(
-          color: AppColors.brass,
+          color: AppColors.primary,
           onRefresh: _load,
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -122,14 +122,14 @@ class _AllotmentCard extends StatelessWidget {
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: (isActive ? AppColors.allottedGreen : AppColors.vacantGray)
+            color: (isActive ? AppColors.allottedGreen : AppColors.textSecondary)
                 .withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
             isActive ? 'Current' : 'Vacated',
             style: TextStyle(
-              color: isActive ? AppColors.allottedGreen : AppColors.vacantGray,
+              color: isActive ? AppColors.allottedGreen : AppColors.textSecondary,
               fontWeight: FontWeight.w700,
               fontSize: 12,
             ),

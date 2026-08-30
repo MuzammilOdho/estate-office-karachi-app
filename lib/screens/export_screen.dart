@@ -54,6 +54,9 @@ class _ExportScreenState extends State<ExportScreen> {
   Timer? _debounce;
   bool _isSearchingUnits = false;
   List<UnitListItem> _unitSearchResults = [];
+  /// Monotonic token — drops out-of-order search responses so a slow
+  /// earlier query can't overwrite the results of a newer one.
+  int _unitSearchSeq = 0;
   String? _selectedUnitId;
   String _selectedUnitLabel = '';
 
@@ -98,6 +101,7 @@ class _ExportScreenState extends State<ExportScreen> {
   }
 
   Future<void> _searchUnits(String query) async {
+    final seq = ++_unitSearchSeq;
     if (query.trim().isEmpty) {
       setState(() => _unitSearchResults = []);
       return;
@@ -105,12 +109,14 @@ class _ExportScreenState extends State<ExportScreen> {
     setState(() => _isSearchingUnits = true);
     try {
       final results = await _unitsRepository.searchAllUnits(query);
-      if (!mounted) return;
+      if (!mounted || seq != _unitSearchSeq) return;
       setState(() => _unitSearchResults = results);
     } catch (_) {
       // Non-fatal — an empty result list is an acceptable fallback here.
     } finally {
-      if (mounted) setState(() => _isSearchingUnits = false);
+      if (mounted && seq == _unitSearchSeq) {
+        setState(() => _isSearchingUnits = false);
+      }
     }
   }
 
@@ -257,7 +263,7 @@ class _ExportScreenState extends State<ExportScreen> {
         return const SizedBox.shrink();
       case ExportScope.colony:
         return _isLoadingColonies
-            ? const LinearProgressIndicator(color: AppColors.brass)
+            ? const LinearProgressIndicator(color: AppColors.primary)
             : DropdownButtonFormField<String>(
           initialValue: _selectedColony,
           decoration: const InputDecoration(labelText: 'Colony'),
@@ -388,7 +394,7 @@ class _ExportScreenState extends State<ExportScreen> {
       case ExportPeriod.allTime:
         return const Text(
           'Every payment on record for this unit, oldest to newest.',
-          style: TextStyle(color: AppColors.vacantGray, fontSize: 13),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
         );
     }
   }

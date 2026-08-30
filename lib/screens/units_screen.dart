@@ -159,7 +159,7 @@ class _UnitsScreenState extends State<UnitsScreen> {
           );
         }
         return RefreshIndicator(
-          color: AppColors.brass,
+          color: AppColors.primary,
           onRefresh: _load,
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),

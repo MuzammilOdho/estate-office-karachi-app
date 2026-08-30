@@ -303,7 +303,7 @@ class _InfoRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 130,
-            child: Text(label, style: const TextStyle(color: AppColors.vacantGray)),
+            child: Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           ),
           Expanded(
             child: Text(value, style: monospace ? AppTheme.numericData : null),

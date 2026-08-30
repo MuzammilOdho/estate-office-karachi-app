@@ -195,6 +195,15 @@ class _UnitDetailSheetState extends State<UnitDetailSheet> {
             onAllotmentUpdated: _load,
             onVacated: _handleVacated,
           )
+        else if (allotment != null)
+          // Rare historical-data state: an active allotment whose
+          // allottee relation is empty. Falling through to the allot form
+          // (the old behaviour) was misleading — submitting it just failed
+          // with "already has an active allotment".
+          const _AdminOnlyNotice(
+            message: 'This unit has an active allotment without a linked '
+                'allottee record. Please correct this record.',
+          )
         else if (isAdmin)
           AllotUnitForm(
             unitId: unit.id,
@@ -219,15 +228,15 @@ class _AdminOnlyNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.vacantGray.withValues(alpha: 0.1),
+        color: AppColors.textSecondary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
-          const Icon(Icons.lock_outline, size: 18, color: AppColors.vacantGray),
+          const Icon(Icons.lock_outline, size: 18, color: AppColors.textSecondary),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(message, style: const TextStyle(color: AppColors.vacantGray)),
+            child: Text(message, style: const TextStyle(color: AppColors.textSecondary)),
           ),
         ],
       ),
@@ -250,7 +259,7 @@ class _InfoRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 90,
-            child: Text(label, style: const TextStyle(color: AppColors.vacantGray)),
+            child: Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           ),
           Expanded(
             child: Text(

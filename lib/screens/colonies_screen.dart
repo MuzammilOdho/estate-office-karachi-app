@@ -1,25 +1,27 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/unit_list_item.dart';
+import '../config/constants.dart';
 import '../providers/auth_provider.dart';
 import '../repositories/units_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_exception.dart';
+import '../widgets/app_branding.dart';
 import '../widgets/state_views.dart';
-import '../widgets/unit_card.dart';
 import 'add_unit_sheet.dart';
 import 'audit_log_screen.dart';
 import 'export_screen.dart';
+import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'types_screen.dart';
-import 'unit_detail_sheet.dart';
 
-/// Home screen. Search box always on top (global — finds a unit from
-/// anywhere by house no / allottee name / CNIC, no drill-down needed);
-/// below it, when the search box is empty, the colony browse list.
+/// Home screen: official masthead (logo + application name + tagline),
+/// the estate-wide Search entry point in the app bar, and below it the
+/// colony browse list (Colony → Category → Units drill-down unchanged).
+///
+/// The old always-visible global search field was removed — all searching
+/// now goes through the structured, server-side Search screen opened
+/// from the app bar's search icon.
 class ColoniesScreen extends StatefulWidget {
   const ColoniesScreen({super.key});
 
@@ -31,34 +33,15 @@ enum _LoadState { loading, loaded, error }
 
 class _ColoniesScreenState extends State<ColoniesScreen> {
   final _unitsRepository = UnitsRepository();
-  final _searchController = TextEditingController();
-  Timer? _debounce;
 
   _LoadState _coloniesState = _LoadState.loading;
   String? _errorMessage;
   List<String> _colonies = [];
 
-  bool _isSearching = false;
-  List<UnitListItem> _searchResults = [];
-  bool _searchAttempted = false;
-  String? _searchError;
-  /// Whether the search field is non-empty — used to toggle between the
-  /// search-results and colony-list UI. Only triggers a rebuild when the
-  /// empty ↔ non-empty transition actually happens, avoiding per-keystroke
-  /// full-Scaffold rebuilds.
-  bool _isSearchingMode = false;
-
   @override
   void initState() {
     super.initState();
     _loadColonies();
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadColonies() async {
@@ -82,60 +65,35 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
     }
   }
 
-  void _onSearchChanged(String query) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), () => _runSearch(query));
-  }
-
-  Future<void> _runSearch(String query) async {
-    if (query.trim().isEmpty) {
-      setState(() {
-        _searchResults = [];
-        _searchAttempted = false;
-        _searchError = null;
-      });
-      return;
-    }
-    setState(() => _isSearching = true);
-    try {
-      final results = await _unitsRepository.searchAllUnits(query);
-      if (!mounted) return;
-      setState(() {
-        _searchResults = results;
-        _searchAttempted = true;
-        _searchError = null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _searchError = e is AppException ? e.message : 'Something went wrong.';
-      });
-    } finally {
-      if (mounted) setState(() => _isSearching = false);
-    }
-  }
-
-  void _openUnit(String unitId) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => UnitDetailSheet(unitId: unitId),
-    ).then((_) {
-      _loadColonies();
-      if (_searchController.text.trim().isNotEmpty) {
-        _runSearch(_searchController.text);
-      }
-    });
+  void _openSearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SearchScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Estate Office Karachi'),
+        toolbarHeight: 80,
+        title: const Row(
+          children: [
+            AppLogo(size: 72),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                AppInfo.name,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         actions: [
+          IconButton(
+            tooltip: 'Search',
+            icon: const Icon(Icons.search),
+            onPressed: _openSearch,
+          ),
           IconButton(
             tooltip: 'Export report',
             icon: const Icon(Icons.ios_share_rounded),
@@ -167,102 +125,32 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) {
-                  final wasSearchingMode = _isSearchingMode;
-                  _isSearchingMode = value.trim().isNotEmpty;
-                  if (wasSearchingMode != _isSearchingMode) {
-                    setState(() {}); // empty ↔ non-empty transition only
-                  }
-                  _onSearchChanged(value);
-                },
-                decoration: InputDecoration(
-                  hintText: 'Search house no, name, CNIC, personal no, or phone',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _isSearching
-                      ? const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                      : (_isSearchingMode
-                      ? IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() {
-                        _searchResults = [];
-                        _searchAttempted = false;
-                        _searchError = null;
-                      });
-                    },
-                  )
-                      : null),
-                ),
-              ),
+        child: Center(
+          // Keeps the content column at a readable width on tablets,
+          // desktop and wide browser windows; phones are unaffected.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildColoniesList()),
+              ],
             ),
-            Expanded(
-              child: _isSearchingMode ? _buildSearchResults() : _buildColoniesList(),
-            ),
-          ],
+          ),
         ),
       ),
-      floatingActionButton: (_isSearchingMode || !context.watch<AuthProvider>().isAdmin)
+      floatingActionButton: !context.watch<AuthProvider>().isAdmin
           ? null
           : FloatingActionButton(
-        tooltip: 'Add unit',
-        onPressed: () => showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          useSafeArea: true,
-          builder: (_) => const AddUnitSheet(),
-        ).then((_) => _loadColonies()),
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  Widget _buildSearchResults() {
-    if (_searchError != null && !_isSearching) {
-      return ErrorRetryView(
-        message: _searchError!,
-        onRetry: () {
-          setState(() => _searchError = null);
-          _runSearch(_searchController.text);
-        },
-      );
-    }
-    if (_searchResults.isEmpty) {
-      if (_isSearching) return const LoadingView();
-      if (_searchAttempted) {
-        return const EmptyStateView(
-          icon: Icons.search_off_rounded,
-          title: 'No matches',
-          subtitle: 'Try a different house no, name, CNIC, personal no, or phone.',
-        );
-      }
-      return const SizedBox.shrink();
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-      itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        final item = _searchResults[index];
-        return UnitCard(
-          item: item,
-          showColonyAndType: true,
-          onTap: () => _openUnit(item.unit.id),
-        );
-      },
+              tooltip: 'Add unit',
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (_) => const AddUnitSheet(),
+              ).then((_) => _loadColonies()),
+              child: const Icon(Icons.add),
+            ),
     );
   }
 
@@ -278,25 +166,52 @@ class _ColoniesScreenState extends State<ColoniesScreen> {
       case _LoadState.loaded:
         if (_colonies.isEmpty) {
           return const EmptyStateView(
-            icon: Icons.location_city_outlined,
-            title: 'No colonies yet',
+            icon: Icons.map_outlined,
+            title: 'No areas yet',
             subtitle: 'Tap the + button to add the first unit.',
           );
         }
         return RefreshIndicator(
-          color: AppColors.brass,
+          color: AppColors.primary,
           onRefresh: _loadColonies,
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: _colonies.length,
+            padding: const EdgeInsets.only(bottom: 24),
+            itemCount: _colonies.length + 1,
             itemBuilder: (context, index) {
-              final colony = _colonies[index];
-              return ListTile(
-                leading: const Icon(Icons.location_city_outlined, color: AppColors.brass),
-                title: Text(colony, style: Theme.of(context).textTheme.titleMedium),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => TypesScreen(colony: colony)),
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                  child: Text(
+                    'Areas',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                );
+              }
+              final colony = _colonies[index - 1];
+              return Card(
+                elevation: 0,
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.1),
+                  ),
+                ),
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  title: Text(
+                    colony,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TypesScreen(colony: colony),
+                    ),
+                  ),
                 ),
               );
             },

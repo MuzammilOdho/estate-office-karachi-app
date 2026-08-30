@@ -82,7 +82,7 @@ class _AllotteeHistoryScreenState extends State<AllotteeHistoryScreen> {
           );
         }
         return RefreshIndicator(
-          color: AppColors.brass,
+          color: AppColors.primary,
           onRefresh: _load,
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -117,7 +117,7 @@ class _ModificationCard extends StatelessWidget {
                 ),
                 Text(
                   DateFormat('dd MMM yyyy, hh:mm a').format(entry.changedAt),
-                  style: const TextStyle(color: AppColors.vacantGray, fontSize: 12),
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
               ],
             ),
@@ -127,7 +127,7 @@ class _ModificationCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Remarks: ${entry.remarks}',
-                style: const TextStyle(color: AppColors.vacantGray, fontSize: 13),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
             ],
             if (entry.documentUrls.isNotEmpty) ...[
@@ -213,7 +213,7 @@ class _DocumentThumb extends StatelessWidget {
             width: 64,
             height: 64,
             color: AppColors.divider,
-            child: const Icon(Icons.insert_drive_file_outlined, color: AppColors.vacantGray),
+            child: const Icon(Icons.insert_drive_file_outlined, color: AppColors.textSecondary),
           ),
         ),
       ),

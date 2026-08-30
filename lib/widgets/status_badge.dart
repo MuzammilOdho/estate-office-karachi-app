@@ -11,7 +11,7 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isAllotted ? AppColors.allottedGreen : AppColors.vacantGray;
+    final color = isAllotted ? AppColors.allottedGreen : AppColors.textSecondary;
     final label = isAllotted ? 'Allotted' : 'Vacant';
 
     return Container(

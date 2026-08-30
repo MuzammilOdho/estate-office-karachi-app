@@ -23,10 +23,10 @@ class UnitCard extends StatelessWidget {
 
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -44,10 +44,10 @@ class UnitCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 showColonyAndType ? '${unit.colony} · ${unit.type}' : unit.type,
-                style: const TextStyle(color: AppColors.vacantGray, fontSize: 13),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
               if (allottee != null && allottee.isNotEmpty) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
                   allottee,
                   maxLines: 1,

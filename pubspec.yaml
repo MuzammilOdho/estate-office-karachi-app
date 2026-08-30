@@ -15,10 +15,10 @@ dependencies:
   pocketbase: ^0.22.0
   http: ^1.2.2
 
-  # State management (per spec: setState/Provider ONLY, no Bloc/Riverpod/GetX)
+  # State management
   provider: ^6.1.2
 
-  # Local, on-device settings only (server URL). No local DB / offline cache.
+  # Local, on-device settings only
   shared_preferences: ^2.3.2
 
   # Camera capture for challan photos
@@ -29,7 +29,7 @@ dependencies:
   share_plus: ^11.0.0
   path_provider: ^2.1.4
 
-  # Date formatting ("Jul 2026" style month labels)
+  # Date formatting
   intl: ^0.19.0
 
   cupertino_icons: ^1.0.8
@@ -45,12 +45,19 @@ flutter:
 
   assets:
     - assets/logo.png
+    - assets/icon_foreground.png
 
-# Generates Android/iOS launcher icons from assets/logo.png.
-# Run: dart run flutter_launcher_icons
+# Flutter Launcher Icons
 flutter_launcher_icons:
-  image_path: "assets/logo.png"
   android: true
   ios: true
+
+  # iOS icon
+  image_path: "assets/logo.png"
+
+  # Android adaptive icon
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon_foreground.png"
+
   min_sdk_android: 21
   remove_alpha_ios: true

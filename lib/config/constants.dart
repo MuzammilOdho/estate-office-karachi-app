@@ -21,11 +21,21 @@ class AppDefaults {
   AppDefaults._();
 
   /// Pre-filled but editable in Settings.
-  static const defaultServerUrl = 'http://192.168.1.50:8090';
+  static const defaultServerUrl = 'http://10.11.112.119:8090';
 
   /// Retirement threshold used to auto-derive an allottee's service status
   /// from their date of birth. Strictly greater than, per spec.
   static const retirementAge = 60;
+}
+
+/// Application-wide branding strings — the single source of truth for the
+/// name/tagline shown on the login and home screens (and the OS task
+/// switcher), so both always carry identical wording.
+class AppInfo {
+  AppInfo._();
+
+  static const name = 'Estate Office';
+  static const tagline = 'Estate Registry & Rent Management';
 }
 
 class PrefsKeys {

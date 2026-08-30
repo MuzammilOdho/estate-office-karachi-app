@@ -74,7 +74,7 @@ class _TypesScreenState extends State<TypesScreen> {
           );
         }
         return RefreshIndicator(
-          color: AppColors.brass,
+          color: AppColors.primary,
           onRefresh: _load,
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -82,7 +82,7 @@ class _TypesScreenState extends State<TypesScreen> {
             itemBuilder: (context, index) {
               final type = _types[index];
               return ListTile(
-                leading: const Icon(Icons.category_outlined, color: AppColors.brass),
+                leading: const Icon(Icons.category_outlined, color: AppColors.primary),
                 title: Text(type, style: Theme.of(context).textTheme.titleMedium),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(context).push(

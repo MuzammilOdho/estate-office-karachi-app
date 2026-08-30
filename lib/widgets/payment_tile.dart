@@ -38,10 +38,10 @@ class PaymentTile extends StatelessWidget {
             cacheWidth: thumbPx,
             cacheHeight: thumbPx,
             errorBuilder: (_, __, ___) =>
-            const Icon(Icons.receipt_long_outlined, color: AppColors.vacantGray),
+            const Icon(Icons.receipt_long_outlined, color: AppColors.textSecondary),
           ),
         )
-            : const Icon(Icons.receipt_long_outlined, color: AppColors.vacantGray),
+            : const Icon(Icons.receipt_long_outlined, color: AppColors.textSecondary),
         title: Text(
           'FY ${payment.fy} · ${DateFormat('dd MMM yyyy').format(payment.date)}',
           style: AppTheme.numericData.copyWith(fontSize: 13),

@@ -33,6 +33,9 @@ class AllotteePickerState extends State<AllotteePicker> {
   bool _isSearching = false;
   AllotteeModel? _selectedExisting;
   Timer? _debounce;
+  /// Monotonic token — drops out-of-order search responses so a slow
+  /// earlier query can't overwrite the results of a newer one.
+  int _searchSeq = 0;
 
   // "New allottee" mode
   final _newFormKey = GlobalKey<FormState>();
@@ -68,6 +71,7 @@ class AllotteePickerState extends State<AllotteePicker> {
   }
 
   Future<void> _search(String query) async {
+    final seq = ++_searchSeq;
     if (query.trim().isEmpty) {
       setState(() => _searchResults = []);
       return;
@@ -75,12 +79,12 @@ class AllotteePickerState extends State<AllotteePicker> {
     setState(() => _isSearching = true);
     try {
       final results = await _allotteesRepository.search(query);
-      if (!mounted) return;
+      if (!mounted || seq != _searchSeq) return;
       setState(() => _searchResults = results);
     } catch (_) {
       // Non-fatal — an empty result list is an acceptable fallback here.
     } finally {
-      if (mounted) setState(() => _isSearching = false);
+      if (mounted && seq == _searchSeq) setState(() => _isSearching = false);
     }
   }
 
@@ -266,7 +270,7 @@ class AllotteePickerState extends State<AllotteePicker> {
             padding: EdgeInsets.only(top: 8),
             child: Text(
               'No matches. Switch to "New allottee" if they\'re not on record yet.',
-              style: TextStyle(color: AppColors.vacantGray, fontSize: 13),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
           ),
         ],
@@ -338,7 +342,7 @@ class AllotteePickerState extends State<AllotteePicker> {
           ),
           if (_isCreating) ...[
             const SizedBox(height: 10),
-            const LinearProgressIndicator(color: AppColors.brass),
+            const LinearProgressIndicator(color: AppColors.primary),
           ],
         ],
       ),

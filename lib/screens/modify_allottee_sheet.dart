@@ -222,7 +222,7 @@ class _ModifyAllotteeSheetState extends State<ModifyAllotteeSheet> {
                 const Text(
                   'Changes are recorded with your name and the date, along with '
                       'the documents you attach below.',
-                  style: TextStyle(color: AppColors.vacantGray, fontSize: 13),
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:pocketbase/pocketbase.dart';
 
 import '../config/constants.dart';
@@ -7,6 +8,7 @@ import '../models/unit_model.dart';
 import '../services/pocketbase_service.dart';
 import '../utils/app_exception.dart';
 import '../utils/natural_sort.dart';
+import '../utils/paged_result.dart';
 
 class UnitsRepository {
   PocketBase get _pb => PocketBaseService.instance.client;
@@ -114,10 +116,25 @@ class UnitsRepository {
       // allotted unit via its allotment). unit.* / allottee.* are
       // PocketBase relation-chain filters, already used by ExportRepository.
       //
-      // personal_no and phone were added later and may not exist on the
-      // server yet — try the full filter first, then fall back without them.
-      var allotmentsPage = await _searchAllotments(query);
-
+      // Single query, no fallback: the old try/fallback-on-failure pattern
+      // doubled the worst-case wall-clock time when the server was merely
+      // slow or unreachable (two full timeouts back to back).
+      final allotmentsPage =
+          await _pb.collection(Collections.allotments).getList(
+        page: 1,
+        perPage: _searchPageSize,
+        filter: _pb.filter(
+          'date_of_vacancy = {:empty} && ('
+              'unit.house_no ~ {:q} || unit.block ~ {:q} || '
+              'unit.flat_no ~ {:q} || unit.colony ~ {:q} || unit.type ~ {:q} || '
+              'allottee.name ~ {:q} || allottee.cnic ~ {:q} || '
+              'allottee.designation ~ {:q} || allottee.department ~ {:q} || '
+              'allottee.personal_no ~ {:q} || allottee.phone ~ {:q}'
+              ')',
+          {'empty': '', 'q': query.trim()},
+        ),
+        expand: 'allottee, unit',
+      );
 
       // Build the union keyed by unit id so a unit matched by both
       // queries isn't listed twice. Allotment-sourced rows carry the
@@ -163,43 +180,185 @@ class UnitsRepository {
     }
   }
 
-  /// Fetches active allotments matching the query across unit + allottee
-  /// fields. Tries the full filter (including `personal_no` and `phone`)
-  /// first; if the server doesn't have those fields yet, falls back to
-  /// the core filter so search never breaks.
-  Future<ResultList<RecordModel>> _searchAllotments(String query) async {
+  /// Structured, server-side search backing the advanced Search screen:
+  /// Type/Category, House No., Allottee Name, CNIC and Personal No. — each
+  /// one optional, every provided one AND-combined. All matching happens
+  /// on the server, so with ~8,000 units only the matching rows (capped
+  /// at one page of [_searchPageSize]) ever cross the LAN — never the
+  /// whole estate.
+  ///
+  /// Allottee fields only exist through a unit's active allotment, so
+  /// when any allottee field is provided the query runs against the
+  /// `allotments` collection with `allottee` + `unit` expanded (a vacant
+  /// unit can't match an allottee filter — exactly what AND semantics
+  /// require). With only unit fields it runs against `units` and is
+  /// joined with active allotments afterwards, so vacant units match too.
+  Future<PagedResult<UnitListItem>> searchFilteredUnits({
+    String type = '',
+    String houseNo = '',
+    String cnic = '',
+    String name = '',
+    String personalNo = '',
+  }) async {
+    final parts = buildSearchFilterParts(
+      type: type,
+      houseNo: houseNo,
+      cnic: cnic,
+      name: name,
+      personalNo: personalNo,
+    );
+    if (parts.isEmpty) {
+      throw const AppException('Enter at least one filter to search.');
+    }
+
+    final viaAllotments = parts.requiresAllotmentJoin;
+    final template = searchFilterTemplate(parts, viaAllotments: viaAllotments);
+    final params = {...parts.params, if (viaAllotments) 'empty': ''};
+
     try {
-      return await _pb.collection(Collections.allotments).getList(
+      if (viaAllotments) {
+        final page = await _pb.collection(Collections.allotments).getList(
+          page: 1,
+          perPage: _searchPageSize,
+          filter: _pb.filter(template, params),
+          expand: 'allottee, unit',
+        );
+        final items = <UnitListItem>[];
+        for (final r in page.items) {
+          final unitRecord = r.get<RecordModel?>('expand.unit', null);
+          if (unitRecord == null) continue; // orphaned allotment — skip
+          final allotteeRecord = r.get<RecordModel?>('expand.allottee', null);
+          items.add(UnitListItem(
+            unit: UnitModel.fromRecord(unitRecord),
+            activeAllotment: AllotmentModel.fromRecord(r),
+            allotteeName: allotteeRecord?.get<String>('name', ''),
+            allotteeCnic: allotteeRecord?.get<String>('cnic', ''),
+            allotteeDesignation: allotteeRecord?.get<String>('designation', ''),
+            allotteeDepartment: allotteeRecord?.get<String>('department', ''),
+            allotteePersonalNo: allotteeRecord?.get<String>('personal_no', ''),
+            allotteePhone: allotteeRecord?.get<String>('phone', ''),
+          ));
+        }
+        items.sort((a, b) => _compareUnits(a.unit, b.unit));
+        return PagedResult(
+          items: items,
+          page: page.page,
+          perPage: page.perPage,
+          totalItems: page.totalItems,
+          totalPages: page.totalPages,
+        );
+      }
+
+      final page = await _pb.collection(Collections.units).getList(
         page: 1,
         perPage: _searchPageSize,
-        filter: _pb.filter(
-          'date_of_vacancy = {:empty} && ('
-              'unit.house_no ~ {:q} || unit.block ~ {:q} || '
-              'unit.flat_no ~ {:q} || unit.colony ~ {:q} || unit.type ~ {:q} || '
-              'allottee.name ~ {:q} || allottee.cnic ~ {:q} || '
-              'allottee.designation ~ {:q} || allottee.department ~ {:q} || '
-              'allottee.personal_no ~ {:q} || allottee.phone ~ {:q}'
-              ')',
-          {'empty': '', 'q': query.trim()},
-        ),
-        expand: 'allottee, unit',
+        filter: _pb.filter(template, params),
       );
-    } catch (_) {
-      return await _pb.collection(Collections.allotments).getList(
-        page: 1,
-        perPage: _searchPageSize,
-        filter: _pb.filter(
-          'date_of_vacancy = {:empty} && ('
-              'unit.house_no ~ {:q} || unit.block ~ {:q} || '
-              'unit.flat_no ~ {:q} || unit.colony ~ {:q} || unit.type ~ {:q} || '
-              'allottee.name ~ {:q} || allottee.cnic ~ {:q} || '
-              'allottee.designation ~ {:q} || allottee.department ~ {:q}'
-              ')',
-          {'empty': '', 'q': query.trim()},
-        ),
-        expand: 'allottee, unit',
+      final joined = await _joinUnitsWithActiveAllotmentsFor(page.items);
+      joined.sort((a, b) => _compareUnits(a.unit, b.unit));
+      return PagedResult(
+        items: joined,
+        page: page.page,
+        perPage: page.perPage,
+        totalItems: page.totalItems,
+        totalPages: page.totalPages,
+      );
+    } catch (e) {
+      throw asAppException(e);
+    }
+  }
+
+  /// Builds the per-field clauses for [searchFilteredUnits]. Unit-field
+  /// clauses are emitted WITHOUT a relation prefix (the template builder
+  /// adds `unit.` when the query runs through the allotments collection);
+  /// allottee clauses always carry the `allottee.` prefix. Pure and
+  /// server-free so the AND-composition logic is unit-testable.
+  @visibleForTesting
+  static SearchFilterParts buildSearchFilterParts({
+    String type = '',
+    String houseNo = '',
+    String cnic = '',
+    String name = '',
+    String personalNo = '',
+  }) {
+    final t = type.trim();
+    final hn = houseNo.trim();
+    final c = cnic.trim();
+    final n = name.trim();
+    final pn = personalNo.trim();
+
+    final unitClauses = <SearchFilterClause>[];
+    final allotteeClauses = <SearchFilterClause>[];
+
+    if (t.isNotEmpty) {
+      unitClauses.add(
+        SearchFilterClause(fields: const ['type'], paramName: 'type', paramValue: t),
       );
     }
+    // One "House No." field, but a unit's identifying number may live in
+    // house_no, block, or flat_no (standalone house vs block of flats), so
+    // the criterion ORs the three identifier columns. The group as a whole
+    // still ANDs with every other filter.
+    if (hn.isNotEmpty) {
+      unitClauses.add(
+        SearchFilterClause(
+          fields: const ['house_no', 'block', 'flat_no'],
+          paramName: 'houseNo',
+          paramValue: hn,
+        ),
+      );
+    }
+    if (n.isNotEmpty) {
+      allotteeClauses.add(
+        SearchFilterClause(fields: const ['name'], paramName: 'name', paramValue: n),
+      );
+    }
+    if (c.isNotEmpty) {
+      allotteeClauses.add(
+        SearchFilterClause(fields: const ['cnic'], paramName: 'cnic', paramValue: c),
+      );
+    }
+    if (pn.isNotEmpty) {
+      allotteeClauses.add(
+        SearchFilterClause(
+          fields: const ['personal_no'],
+          paramName: 'personalNo',
+          paramValue: pn,
+        ),
+      );
+    }
+
+    return SearchFilterParts(
+      unitClauses: unitClauses,
+      allotteeClauses: allotteeClauses,
+    );
+  }
+
+  /// Joins the clauses into the final filter template with AND logic.
+  /// When [viaAllotments] is true the query targets the allotments
+  /// collection, so unit-field clauses get the `unit.` relation prefix and
+  /// the active-allotment condition (`date_of_vacancy = ''`) is prepended.
+  @visibleForTesting
+  static String searchFilterTemplate(
+    SearchFilterParts parts, {
+    required bool viaAllotments,
+  }) {
+    final unitPrefix = viaAllotments ? 'unit.' : '';
+    final clauses = [
+      if (viaAllotments) 'date_of_vacancy = {:empty}',
+      for (final c in parts.unitClauses) _clauseExpr(c, unitPrefix),
+      for (final c in parts.allotteeClauses) _clauseExpr(c, 'allottee.'),
+    ];
+    return clauses.join(' && ');
+  }
+
+  static String _clauseExpr(SearchFilterClause clause, String prefix) {
+    final comparisons =
+        clause.fields.map((f) => '$prefix$f ~ {:${clause.paramName}}');
+    // Parenthesize OR groups so they AND correctly with the other clauses.
+    return comparisons.length == 1
+        ? comparisons.first
+        : '(${comparisons.join(' || ')})';
   }
 
   /// Lower is a better match: 0 = exact match on an identifying field,
@@ -358,4 +517,41 @@ class UnitsRepository {
       throw asAppException(e);
     }
   }
+}
+
+/// One field criterion for [UnitsRepository.searchFilteredUnits]: the
+/// column(s) to match (OR-combined when several) and the bound parameter.
+class SearchFilterClause {
+  final List<String> fields;
+  final String paramName;
+  final String paramValue;
+
+  const SearchFilterClause({
+    required this.fields,
+    required this.paramName,
+    required this.paramValue,
+  });
+}
+
+/// The clauses + bound params produced by
+/// [UnitsRepository.buildSearchFilterParts].
+class SearchFilterParts {
+  final List<SearchFilterClause> unitClauses;
+  final List<SearchFilterClause> allotteeClauses;
+
+  const SearchFilterParts({
+    required this.unitClauses,
+    required this.allotteeClauses,
+  });
+
+  /// True when at least one allottee-field filter is present — the query
+  /// must then run through the allotments collection (relation fields).
+  bool get requiresAllotmentJoin => allotteeClauses.isNotEmpty;
+
+  bool get isEmpty => unitClauses.isEmpty && allotteeClauses.isEmpty;
+
+  Map<String, dynamic> get params => {
+        for (final c in [...unitClauses, ...allotteeClauses])
+          c.paramName: c.paramValue,
+      };
 }
